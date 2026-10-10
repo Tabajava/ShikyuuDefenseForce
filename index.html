@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>子宮防衛軍 (Shikyuu Defense Force - SDF)</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- MQTT.js CDN -->
+  <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;800&family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@700;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'M PLUS Rounded 1c', 'Fredoka', sans-serif;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .title-font {
+      font-family: 'Mochiy Pop One', cursive;
+    }
+    /* Bio-neon background glow */
+    .bg-bio {
+      background: radial-gradient(circle at center, #2e0854 0%, #15002b 60%, #080012 100%);
+    }
+    .text-shadow-pop {
+      text-shadow: 3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
+    }
+    .comic-box {
+      border: 4px solid #000;
+      box-shadow: 6px 6px 0px #000;
+    }
+    .comic-btn {
+      border: 3px solid #000;
+      box-shadow: 4px 4px 0px #000;
+      transition: all 0.1s ease;
+    }
+    .comic-btn:active {
+      transform: translate(3px, 3px);
+      box-shadow: 1px 1px 0px #000;
+    }
+    canvas {
+      image-rendering: auto;
+    }
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #ec4899;
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body class="bg-bio text-white h-screen w-screen overflow-hidden flex flex-col justify-between">
+
+  <!-- TOP STATUS BAR -->
+  <header id="gameHeader" class="w-full px-4 py-2 flex items-center justify-between z-10 border-b-2 border-pink-500/30 bg-black/40 backdrop-blur-sm">
+    <div class="flex items-center space-x-3">
+      <div class="bg-yellow-400 text-black px-3 py-1 rounded-full font-black text-xs md:text-sm tracking-wider comic-box">
+        SDF: 子宮防衛軍
+      </div>
+      <div id="roomBadge" class="hidden text-xs md:text-sm bg-purple-900/80 px-2 py-1 rounded border border-purple-400 text-purple-200">
+        ROOM: <span id="displayRoomCode" class="font-mono font-bold text-yellow-300">-</span>
+      </div>
+    </div>
+    <!-- In-Game Stats (Hidden in lobby) -->
+    <div id="hudStats" class="hidden flex items-center space-x-4 md:space-x-8">
+      <div class="text-center">
+        <div class="text-[10px] text-pink-300 font-bold uppercase tracking-widest">防御残存時間</div>
+        <div id="hudTimer" class="title-font text-2xl md:text-3xl text-yellow-300 text-shadow-pop">60<span class="text-sm">s</span></div>
+      </div>
+      <div class="text-center">
+        <div class="text-[10px] text-cyan-300 font-bold uppercase tracking-widest">透明帯バリア</div>
+        <div class="w-24 md:w-44 bg-gray-900 h-5 rounded-full border-2 border-black overflow-hidden relative">
+          <div id="hudShieldBar" class="bg-gradient-to-r from-emerald-400 via-cyan-400 to-pink-500 h-full w-full transition-all duration-200"></div>
+          <span id="hudShieldText" class="absolute inset-0 flex items-center justify-center text-[10px] font-black text-black">100%</span>
+        </div>
+      </div>
+    </div>
+    <!-- Top Right Buttons -->
+    <div class="flex items-center space-x-2">
+      <button id="btnToggleSettings" class="comic-btn bg-pink-600 hover:bg-pink-500 text-white text-xs px-2.5 py-1.5 rounded font-bold">
+        <i class="fa-solid fa-camera"></i> 写真設定
+      </button>
+      <button id="btnShareLink" class="comic-btn bg-cyan-500 hover:bg-cyan-400 text-black text-xs px-2.5 py-1.5 rounded font-bold hidden">
+        <i class="fa-solid fa-share-nodes"></i> 招待
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 relative w-full h-full overflow-hidden flex items-center justify-center">
+    <!-- Action Canvas -->
+    <canvas id="gameCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+
+    <!-- FLOATING IN-GAME CONTROLS (TOUCH/MOBILE FRIENDLY) -->
+    <div id="mobileControls" class="absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none z-20">
+      <!-- Joystick virtual area / hint -->
+      <div class="bg-black/40 backdrop-blur border border-white/20 p-2 rounded-xl text-[11px] text-gray-300 pointer-events-auto select-none">
+        <span class="text-yellow-400 font-bold"><i class="fa-solid fa-gamepad"></i> 移動:</span> WASD / 方向キー / ドラッグ<br>
+        <span class="text-cyan-400 font-bold"><i class="fa-solid fa-hand-fist"></i> 特技:</span> SPACEキー / クリック
+      </div>
+
+      <!-- Skill Action Button -->
+      <button id="btnActionSkill" class="comic-btn bg-gradient-to-r from-yellow-400 to-orange-500 text-black active:scale-95 font-black text-lg md:text-xl w-24 h-24 md:w-28 md:h-28 rounded-full pointer-events-auto flex flex-col items-center justify-center border-4 border-black shadow-lg">
+        <i id="skillIcon" class="fa-solid fa-shoe-prints text-2xl md:text-3xl mb-0.5"></i>
+        <span id="skillName" class="text-xs font-bold leading-tight">特技発動</span>
+        <span id="skillCdLabel" class="text-[9px] text-gray-900 font-bold">READY</span>
+      </button>
+    </div>
+
+    <!-- LOBBY OVERLAY -->
+    <div id="lobbyModal" class="absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-30">
+      <div class="comic-box bg-slate-900 border-pink-500 w-full max-w-xl rounded-2xl p-5 md:p-6 text-white relative max-h-[95vh] overflow-y-auto">
+        <div class="text-center mb-4">
+          <div class="inline-block bg-pink-600 text-white text-[11px] font-black px-3 py-0.5 rounded-full uppercase tracking-wider mb-1">
+            Co-op Biological Defense Action
+          </div>
+          <h1 class="title-font text-3xl md:text-4xl text-yellow-300 text-shadow-pop">
+            子 宮 防 衛 軍
+          </h1>
+          <p class="text-xs text-pink-200 mt-1">「SDF! SDF! 迫り来るオスライオン精子からメス卵子を死守せよ！」</p>
+        </div>
+
+        <!-- Room setup -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4 bg-slate-800/80 p-3 rounded-xl border border-slate-700">
+          <div>
+            <label class="block text-xs font-bold text-yellow-300 mb-1">隊員名 (ニックネーム)</label>
+            <input type="text" id="inputPlayerName" maxlength="10" value="隊員01" class="w-full bg-slate-900 border-2 border-slate-600 rounded px-2.5 py-1.5 text-sm font-bold focus:border-pink-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-yellow-300 mb-1">ルームコード</label>
+            <div class="flex space-x-1">
+              <input type="text" id="inputRoomCode" placeholder="例: SDF01" maxlength="8" class="uppercase w-full bg-slate-900 border-2 border-slate-600 rounded px-2.5 py-1.5 text-sm font-mono font-bold focus:border-pink-500 focus:outline-none">
+              <button id="btnGenRoom" class="comic-btn bg-purple-600 text-xs px-2.5 py-1 rounded font-bold">生成</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Role Select (1-8 players can duplicate freely) -->
+        <div class="mb-4">
+          <label class="block text-xs font-bold text-yellow-300 mb-2">役職を選択 (自由選択・重複大歓迎！)</label>
+          <div class="grid grid-cols-2 gap-2 text-left" id="roleSelectionGrid">
+            <!-- Role 1: Slipper -->
+            <button type="button" data-role="slipper" class="role-card border-2 border-pink-500 bg-pink-950/40 p-2.5 rounded-xl text-left hover:bg-pink-900/50 transition">
+              <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-shoe-prints text-pink-400 text-xl"></i>
+                <div>
+                  <div class="text-xs font-black text-pink-300">スリッパ叩き隊</div>
+                  <div class="text-[10px] text-gray-300">巨大スリッパで一撃撲滅！</div>
+                </div>
+              </div>
+            </button>
+            <!-- Role 2: Acid Spray -->
+            <button type="button" data-role="acid" class="role-card border-2 border-slate-700 bg-slate-800/40 p-2.5 rounded-xl text-left hover:bg-emerald-950/40 transition">
+              <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-spray-can text-emerald-400 text-xl"></i>
+                <div>
+                  <div class="text-xs font-black text-emerald-300">強酸スプレー隊</div>
+                  <div class="text-[10px] text-gray-300">酸の霧で継続溶解＆鈍足化</div>
+                </div>
+              </div>
+            </button>
+            <!-- Role 3: Shield Repair -->
+            <button type="button" data-role="repair" class="role-card border-2 border-slate-700 bg-slate-800/40 p-2.5 rounded-xl text-left hover:bg-cyan-950/40 transition">
+              <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-shield-halved text-cyan-400 text-xl"></i>
+                <div>
+                  <div class="text-xs font-black text-cyan-300">透明帯リペア隊</div>
+                  <div class="text-[10px] text-gray-300">バリア膜の回復とパルス衝撃</div>
+                </div>
+              </div>
+            </button>
+            <!-- Role 4: Vacuum Bazooka -->
+            <button type="button" data-role="vacuum" class="role-card border-2 border-slate-700 bg-slate-800/40 p-2.5 rounded-xl text-left hover:bg-yellow-950/40 transition">
+              <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-wind text-yellow-400 text-xl"></i>
+                <div>
+                  <div class="text-xs font-black text-yellow-300">吸引バズーカ隊</div>
+                  <div class="text-[10px] text-gray-300">広範囲の精子を一網打尽</div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Connection actions -->
+        <div class="flex flex-col space-y-2">
+          <div class="flex space-x-2">
+            <button id="btnConnectRoom" class="comic-btn flex-1 bg-green-500 hover:bg-green-400 text-black font-black text-sm py-2.5 rounded-xl flex items-center justify-center space-x-2">
+              <i class="fa-solid fa-satellite-dish"></i> <span>ルーム接続 / 待機</span>
+            </button>
+            <button id="btnSoloStart" class="comic-btn bg-amber-400 hover:bg-amber-300 text-black font-black text-sm px-4 py-2.5 rounded-xl">
+              1人で即開始
+            </button>
+          </div>
+
+          <!-- Lobby active members list (visible when connected) -->
+          <div id="lobbyRosterSection" class="hidden mt-3 pt-3 border-t border-slate-700">
+            <div class="flex justify-between items-center mb-1 text-xs">
+              <span class="font-bold text-gray-300">参加中の防衛隊員 (<span id="playerCount">1</span>/8人):</span>
+              <span id="hostStatusLabel" class="text-yellow-400 font-bold">あなたはホスト(指令長)です</span>
+            </div>
+            <div id="playerListContainer" class="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto mb-3">
+              <!-- Dynamically populated badge items -->
+            </div>
+            <button id="btnHostStartGame" class="comic-btn w-full bg-pink-500 hover:bg-pink-400 text-white font-black text-base py-3 rounded-xl animate-pulse">
+              <i class="fa-solid fa-fire"></i> 全員で防衛作戦を開始せよ！
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CUSTOM PHOTO UPLOAD MODAL -->
+    <div id="settingsModal" class="hidden absolute inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-40">
+      <div class="comic-box bg-slate-900 border-cyan-400 w-full max-w-lg rounded-2xl p-5 text-white">
+        <div class="flex justify-between items-center mb-3">
+          <h2 class="title-font text-lg text-cyan-300"><i class="fa-solid fa-camera-retro"></i> ライオン写真アサイン</h2>
+          <button id="btnCloseSettings" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+        </div>
+        <p class="text-xs text-gray-300 mb-4">
+          どんなサイズ・アスペクト比の写真でも、自動で中央クロップされ丸く綺麗にトリミングされます。ローカル画像ファイルや画像URLを指定できます。
+        </p>
+
+        <!-- Female Lion (Ovum) -->
+        <div class="mb-4 bg-slate-800 p-3 rounded-xl border border-pink-500/40 flex items-center space-x-3">
+          <canvas id="previewFemale" width="60" height="60" class="rounded-full border-2 border-pink-400 bg-black shrink-0"></canvas>
+          <div class="flex-1">
+            <div class="text-xs font-bold text-pink-300">メスライオン写真 (中央の卵子)</div>
+            <input type="file" id="fileFemale" accept="image/*" class="text-[11px] text-gray-300 mt-1 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:bg-pink-600 file:text-white">
+          </div>
+        </div>
+
+        <!-- Male Lion (Sperm) -->
+        <div class="mb-4 bg-slate-800 p-3 rounded-xl border border-yellow-500/40 flex items-center space-x-3">
+          <canvas id="previewMale" width="60" height="60" class="rounded-full border-2 border-yellow-400 bg-black shrink-0"></canvas>
+          <div class="flex-1">
+            <div class="text-xs font-bold text-yellow-300">オスライオン写真 (突撃する精子の頭部)</div>
+            <input type="file" id="fileMale" accept="image/*" class="text-[11px] text-gray-300 mt-1 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:bg-yellow-600 file:text-white">
+          </div>
+        </div>
+
+        <div class="text-right">
+          <button id="btnSavePhotos" class="comic-btn bg-cyan-400 text-black font-bold px-4 py-1.5 rounded-lg text-sm">
+            完了して戻る
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RESULT MODAL -->
+    <div id="resultModal" class="hidden absolute inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center p-4 z-50">
+      <div id="resultCard" class="comic-box bg-slate-900 border-4 w-full max-w-md rounded-2xl p-6 text-center text-white relative">
+        <div id="resultIcon" class="text-6xl mb-2">🎉</div>
+        <h2 id="resultTitle" class="title-font text-3xl md:text-4xl text-shadow-pop mb-2">防衛成功！</h2>
+        <p id="resultSubtitle" class="text-sm font-bold text-pink-200 mb-4">今期はお見送りとなりました！</p>
+        
+        <div id="resultVictimContainer" class="hidden mb-4 p-3 bg-pink-950/60 rounded-xl border border-pink-500 flex flex-col items-center">
+          <span class="text-xs text-yellow-300 font-bold mb-1">【突破した栄光の精子オス】</span>
+          <canvas id="resultVictimCanvas" width="80" height="80" class="rounded-full border-2 border-yellow-400 mb-1"></canvas>
+          <span class="text-[11px] text-pink-200">受精が成立してしまいました…生命の神秘、大勝利！</span>
+        </div>
+
+        <button id="btnRestartGame" class="comic-btn bg-yellow-400 hover:bg-yellow-300 text-black font-black text-base px-6 py-2.5 rounded-xl w-full">
+          ロビーへ戻る
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // --- APP CONSTANTS & MULTIPLAYER SETUP ---
+    const MQTT_BROKER = 'wss://broker.hivemq.com:8884/mqtt';
+    const TOPIC_PREFIX = 'shikyuu-defenders/v1/';
+    const SENDER_ID = 'p_' + Math.random().toString(36).substring(2, 9);
+
+    const CANVAS = document.getElementById('gameCanvas');
+    const CTX = CANVAS.getContext('2d');
+
+    // Game Roles
+    const ROLES = {
+      slipper: { name: 'スリッパ叩き', color: '#f43f5e', icon: 'fa-shoe-prints', cooldown: 0.5, radius: 95 },
+      acid:    { name: '強酸スプレー', color: '#10b981', icon: 'fa-spray-can',   cooldown: 0.8, radius: 120 },
+      repair:  { name: '透明帯リペア', color: '#06b6d4', icon: 'fa-shield-halved',cooldown: 1.2, radius: 110 },
+      vacuum:  { name: '吸引バズーカ', color: '#f59e0b', icon: 'fa-wind',         cooldown: 1.0, radius: 140 }
+    };
+
+    // State
+    const state = {
+      isHost: false,
+      connected: false,
+      roomCode: '',
+      myId: SENDER_ID,
+      myName: '隊員01',
+      myRole: 'slipper',
+      mqttClient: null,
+      
+      // Players dict: id -> { name, role, x, y, lastAction, targetX, targetY, isHost }
+      players: {},
+      
+      // Game State
+      gameRunning: false,
+      timeLeft: 60,
+      ovumHealth: 100,
+      ovumMaxHealth: 100,
+      lastActionTime: 0,
+      
+      // Entities
+      sperms: [],
+      particles: [],
+      effects: [],
+      
+      // Spawn timer for host
+      spawnTimer: 0,
+      syncTimer: 0
+    };
+
+    // Images
+    const images = {
+      femaleLion: null,
+      maleLion: null,
+      femaleLoaded: false,
+      maleLoaded: false
+    };
+
+    function resizeCanvas() {
+      const parent = CANVAS.parentElement;
+      CANVAS.width = parent.clientWidth;
+      CANVAS.height = parent.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // Generates pop cute fallback cartoon images if custom image not provided
+    function createFallbackLionCanvas(isMale = true) {
+      const c = document.createElement('canvas');
+      c.width = 160;
+      c.height = 160;
+      const ctx = c.getContext('2d');
+
+      // Center
+      const cx = 80, cy = 80;
+
+      if (isMale) {
+        // Male Lion (with majestic yellow/orange mane)
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        for (let i = 0; i < 16; i++) {
+          const angle = (i * Math.PI * 2) / 16;
+          const r = (i % 2 === 0) ? 75 : 62;
+          const px = cx + Math.cos(angle) * r;
+          const py = cy + Math.sin(angle) * r;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = '#000';
+        ctx.stroke();
+
+        // Face
+        ctx.fillStyle = '#fbbf24';
+        ctx.beginPath();
+        ctx.arc(cx, cy + 4, 42, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Ears
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.arc(cx - 30, cy - 30, 14, 0, Math.PI * 2);
+        ctx.arc(cx + 30, cy - 30, 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Eyes & Snout
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(cx - 15, cy - 2, 5, 0, Math.PI * 2);
+        ctx.arc(cx + 15, cy - 2, 5, 0, Math.PI * 2);
+        ctx.fill();
+        // Nose
+        ctx.fillStyle = '#7c2d12';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + 6);
+        ctx.lineTo(cx - 8, cy + 18);
+        ctx.lineTo(cx + 8, cy + 18);
+        ctx.closePath();
+        ctx.fill();
+        // Whiskers
+        ctx.strokeStyle = '#000';
+        ctx.beginPath();
+        ctx.moveTo(cx - 15, cy + 16); ctx.lineTo(cx - 35, cy + 12);
+        ctx.moveTo(cx + 15, cy + 16); ctx.lineTo(cx + 35, cy + 12);
+        ctx.stroke();
+      } else {
+        // Female Lion (Smooth, pink-ish ear bows or flower)
+        ctx.fillStyle = '#fed7aa';
+        ctx.beginPath();
+        ctx.arc(cx, cy, 60, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#000';
+        ctx.stroke();
+
+        // Cute ears
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.arc(cx - 40, cy - 40, 18, 0, Math.PI * 2);
+        ctx.arc(cx + 40, cy - 40, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        // Eyes (Sparkly)
+        ctx.fillStyle = '#000';
+        ctx.beginPath();
+        ctx.arc(cx - 20, cy - 8, 8, 0, Math.PI * 2);
+        ctx.arc(cx + 20, cy - 8, 8, 0, Math.PI * 2);
+        ctx.fill();
+        // Eye highlights
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(cx - 22, cy - 11, 3, 0, Math.PI * 2);
+        ctx.arc(cx + 18, cy - 11, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Cheeks
+        ctx.fillStyle = '#f43f5e';
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.arc(cx - 28, cy + 12, 10, 0, Math.PI * 2);
+        ctx.arc(cx + 28, cy + 12, 10, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+
+        // Snout & cute mouth
+        ctx.fillStyle = '#f43f5e';
+        ctx.beginPath();
+        ctx.arc(cx, cy + 8, 6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const img = new Image();
+      img.src = c.toDataURL();
+      return img;
+    }
+
+    // Initialize images with fallbacks
+    images.maleLion = createFallbackLionCanvas(true);
+    images.femaleLion = createFallbackLionCanvas(false);
+    images.maleLoaded = true;
+    images.femaleLoaded = true;
+
+    // Try auto-loading external default assets if existing
+    const defaultFemale = new Image();
+    defaultFemale.src = 'assets/female_lion.png';
+    defaultFemale.onload = () => { images.femaleLion = defaultFemale; updatePreviewCanvases(); };
+
+    const defaultMale = new Image();
+    defaultMale.src = 'assets/male_lion.png';
+    defaultMale.onload = () => { images.maleLion = defaultMale; updatePreviewCanvases(); };
+
+    /**
+     * Draws an image cropped into a circle centered at (x, y) with given radius.
+     * Guarantees image aspect ratio is maintained (center-cropped square).
+     */
+    function drawCircleCroppedImage(ctx, img, x, y, radius, strokeColor = '#000', strokeWidth = 2) {
+      if (!img || !img.complete || img.naturalWidth === 0) return;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.closePath();
+      ctx.clip();
+
+      const nw = img.naturalWidth;
+      const nh = img.naturalHeight;
+      const minDim = Math.min(nw, nh);
+      const sx = (nw - minDim) / 2;
+      const sy = (nh - minDim) / 2;
+
+      ctx.drawImage(img, sx, sy, minDim, minDim, x - radius, y - radius, radius * 2, radius * 2);
+      ctx.restore();
+
+      if (strokeWidth > 0 && strokeColor) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.lineWidth = strokeWidth;
+        ctx.strokeStyle = strokeColor;
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    function updatePreviewCanvases() {
+      const pFemale = document.getElementById('previewFemale');
+      const pMale = document.getElementById('previewMale');
+      if (pFemale) {
+        const ctxF = pFemale.getContext('2d');
+        ctxF.clearRect(0, 0, 60, 60);
+        drawCircleCroppedImage(ctxF, images.femaleLion, 30, 30, 26, '#f43f5e', 3);
+      }
+      if (pMale) {
+        const ctxM = pMale.getContext('2d');
+        ctxM.clearRect(0, 0, 60, 60);
+        drawCircleCroppedImage(ctxM, images.maleLion, 30, 30, 26, '#eab308', 3);
+      }
+    }
+    setTimeout(updatePreviewCanvases, 200);
+
+    document.getElementById('fileFemale').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const img = new Image();
+          img.onload = () => {
+            images.femaleLion = img;
+            updatePreviewCanvases();
+          };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    document.getElementById('fileMale').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const img = new Image();
+          img.onload = () => {
+            images.maleLion = img;
+            updatePreviewCanvases();
+          };
+          img.src = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    function getRoomTopic() {
+      return `${TOPIC_PREFIX}${state.roomCode}`;
+    }
+
+    function connectMQTT(roomCode, isSolo = false) {
+      state.roomCode = roomCode.toUpperCase();
+      document.getElementById('displayRoomCode').innerText = state.roomCode;
+      document.getElementById('roomBadge').classList.remove('hidden');
+      document.getElementById('btnShareLink').classList.remove('hidden');
+
+      if (isSolo) {
+        state.isHost = true;
+        state.connected = true;
+        registerLocalPlayer();
+        startGameSession();
+        return;
+      }
+
+      const client = mqtt.connect(MQTT_BROKER, {
+        clientId: 'SDF_' + SENDER_ID,
+        clean: true,
+        connectTimeout: 5000
+      });
+
+      state.mqttClient = client;
+
+      client.on('connect', () => {
+        state.connected = true;
+        const topic = getRoomTopic();
+        client.subscribe(topic, { qos: 0 }, (err) => {
+          if (!err) {
+            // Join broadcast
+            publishMessage({
+              type: 'PLAYER_JOIN',
+              sender: SENDER_ID,
+              name: state.myName,
+              role: state.myRole
+            });
+          }
+        });
+        registerLocalPlayer();
+        updateLobbyRosterUI();
+      });
+
+      client.on('message', (topic, payload) => {
+        try {
+          const msg = JSON.parse(payload.toString());
+          // Ignore own messages
+          if (msg.sender === SENDER_ID) return;
+          handleIncomingMessage(msg);
+        } catch (e) {
+          console.error('MQTT parse error', e);
+        }
+      });
+
+      client.on('error', (err) => {
+        console.warn('MQTT Connection Warning', err);
+      });
+    }
+
+    function publishMessage(data) {
+      if (!state.mqttClient || !state.connected) return;
+      const topic = getRoomTopic();
+      state.mqttClient.publish(topic, JSON.stringify(data));
+    }
+
+    function registerLocalPlayer() {
+      state.players[SENDER_ID] = {
+        id: SENDER_ID,
+        name: state.myName,
+        role: state.myRole,
+        x: CANVAS.width / 2 + (Math.random() - 0.5) * 100,
+        y: CANVAS.height / 2 + 100,
+        isHost: state.isHost
+      };
+    }
+
+    function handleIncomingMessage(msg) {
+      switch (msg.type) {
+        case 'PLAYER_JOIN':
+          state.players[msg.sender] = {
+            id: msg.sender,
+            name: msg.name,
+            role: msg.role,
+            x: CANVAS.width / 2 + (Math.random() - 0.5) * 80,
+            y: CANVAS.height / 2 + 120,
+            isHost: false
+          };
+          updateLobbyRosterUI();
+          // If I am host, reply with state sync so newcomer knows game and host
+          if (state.isHost) {
+            publishMessage({
+              type: 'HOST_SYNC',
+              sender: SENDER_ID,
+              gameRunning: state.gameRunning,
+              timeLeft: state.timeLeft,
+              ovumHealth: state.ovumHealth,
+              players: state.players
+            });
+          }
+          break;
+
+        case 'PLAYER_LEAVE':
+          delete state.players[msg.sender];
+          updateLobbyRosterUI();
+          break;
+
+        case 'HOST_SYNC':
+          // Another host already exists
+          if (!state.isHost) {
+            state.ovumHealth = msg.ovumHealth;
+            state.timeLeft = msg.timeLeft;
+            if (msg.gameRunning && !state.gameRunning) {
+              startGameSession(true);
+            }
+          }
+          // Merge player details
+          if (msg.players) {
+            for (let id in msg.players) {
+              if (id !== SENDER_ID) {
+                state.players[id] = msg.players[id];
+              }
+            }
+            updateLobbyRosterUI();
+          }
+          break;
+
+        case 'GAME_START':
+          startGameSession(true);
+          break;
+
+        case 'PLAYER_MOVE':
+          if (state.players[msg.sender]) {
+            state.players[msg.sender].x = msg.x;
+            state.players[msg.sender].y = msg.y;
+          }
+          break;
+
+        case 'PLAYER_ACTION':
+          triggerPlayerSkillVisual(msg.sender, msg.role, msg.x, msg.y);
+          if (state.isHost) {
+            applySkillToSperms(msg.role, msg.x, msg.y);
+          }
+          break;
+
+        case 'HOST_GAME_STATE':
+          // Guest receives authoritative state from host
+          if (!state.isHost) {
+            state.sperms = msg.sperms;
+            state.ovumHealth = msg.ovumHealth;
+            state.timeLeft = msg.timeLeft;
+            if (msg.status === 'WIN') showResult(true);
+            if (msg.status === 'LOSE') showResult(false, msg.killerSperm);
+          }
+          break;
+      }
+    }
+
+    function updateLobbyRosterUI() {
+      const container = document.getElementById('playerListContainer');
+      const countLabel = document.getElementById('playerCount');
+      const rosterSec = document.getElementById('lobbyRosterSection');
+      const hostLabel = document.getElementById('hostStatusLabel');
+
+      rosterSec.classList.remove('hidden');
+      container.innerHTML = '';
+      const pKeys = Object.keys(state.players);
+      countLabel.innerText = pKeys.length;
+
+      // Determine host: either explicit or first alphabetical ID
+      const hostId = Object.keys(state.players).sort()[0];
+      state.isHost = (hostId === SENDER_ID);
+      hostLabel.innerText = state.isHost ? '★ あなたは指令長(ホスト)です' : '一般隊員として参加中';
+
+      pKeys.forEach(id => {
+        const p = state.players[id];
+        const roleData = ROLES[p.role] || ROLES.slipper;
+        const badge = document.createElement('div');
+        badge.className = `flex items-center space-x-1 px-2.5 py-1 rounded-full text-xs font-bold border ${p.id === SENDER_ID ? 'border-yellow-400 bg-yellow-950/80 text-yellow-300' : 'border-slate-600 bg-slate-800 text-gray-200'}`;
+        badge.innerHTML = `<i class="fa-solid ${roleData.icon}" style="color:${roleData.color}"></i> <span>${p.name}${p.id === hostId ? ' 👑' : ''}</span>`;
+        container.appendChild(badge);
+      });
+
+      const startBtn = document.getElementById('btnHostStartGame');
+      if (state.isHost) {
+        startBtn.classList.remove('hidden');
+      } else {
+        startBtn.classList.add('hidden');
+      }
+    }
+
+    // Role card selector
+    document.querySelectorAll('.role-card').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.role-card').forEach(b => {
+          b.classList.remove('border-pink-500', 'bg-pink-950/40');
+          b.classList.add('border-slate-700', 'bg-slate-800/40');
+        });
+        btn.classList.add('border-pink-500', 'bg-pink-950/40');
+        btn.classList.remove('border-slate-700', 'bg-slate-800/40');
+        state.myRole = btn.getAttribute('data-role');
+        updateActionSkillButtonUI();
+
+        if (state.players[SENDER_ID]) {
+          state.players[SENDER_ID].role = state.myRole;
+          publishMessage({
+            type: 'PLAYER_JOIN',
+            sender: SENDER_ID,
+            name: state.myName,
+            role: state.myRole
+          });
+          updateLobbyRosterUI();
+        }
+      });
+    });
+
+    function updateActionSkillButtonUI() {
+      const role = ROLES[state.myRole];
+      document.getElementById('skillIcon').className = `fa-solid ${role.icon} text-2xl md:text-3xl mb-0.5`;
+      document.getElementById('skillName').innerText = role.name;
+    }
+
+    document.getElementById('btnGenRoom').addEventListener('click', () => {
+      const code = 'SDF' + Math.floor(100 + Math.random() * 900);
+      document.getElementById('inputRoomCode').value = code;
+    });
+
+    document.getElementById('btnConnectRoom').addEventListener('click', () => {
+      const nameInput = document.getElementById('inputPlayerName').value.trim();
+      const codeInput = document.getElementById('inputRoomCode').value.trim().toUpperCase();
+      if (!codeInput) {
+        alert('ルームコードを入力してください');
+        return;
+      }
+      state.myName = nameInput || '隊員01';
+      connectMQTT(codeInput);
+    });
+
+    document.getElementById('btnSoloStart').addEventListener('click', () => {
+      state.myName = document.getElementById('inputPlayerName').value.trim() || 'ソロ隊員';
+      connectMQTT('SOLO' + Math.floor(100 + Math.random() * 900), true);
+    });
+
+    document.getElementById('btnHostStartGame').addEventListener('click', () => {
+      if (state.isHost) {
+        publishMessage({ type: 'GAME_START', sender: SENDER_ID });
+        startGameSession();
+      }
+    });
+
+    document.getElementById('btnShareLink').addEventListener('click', () => {
+      const shareUrl = `${window.location.origin}${window.location.pathname}#${state.roomCode}`;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(shareUrl).then(() => {
+          showFloatingToast('招待URLをコピーしました！友達に送信しよう！');
+        });
+      }
+    });
+
+    // Hash auto connect check
+    if (window.location.hash) {
+      const hashRoom = window.location.hash.substring(1).trim().toUpperCase();
+      if (hashRoom) {
+        document.getElementById('inputRoomCode').value = hashRoom;
+      }
+    }
+
+    // Modal toggles
+    document.getElementById('btnToggleSettings').addEventListener('click', () => {
+      document.getElementById('settingsModal').classList.remove('hidden');
+    });
+    document.getElementById('btnCloseSettings').addEventListener('click', () => {
+      document.getElementById('settingsModal').classList.add('hidden');
+    });
+    document.getElementById('btnSavePhotos').addEventListener('click', () => {
+      document.getElementById('settingsModal').classList.add('hidden');
+    });
+
+    function showFloatingToast(text) {
+      const el = document.createElement('div');
+      el.className = 'fixed top-14 left-1/2 -translate-x-1/2 bg-yellow-400 text-black px-4 py-2 rounded-full font-black text-xs z-50 comic-box animate-bounce';
+      el.innerText = text;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 2500);
+    }
+
+    function startGameSession(isGuest = false) {
+      state.gameRunning = true;
+      state.timeLeft = 60;
+      state.ovumHealth = 100;
+      state.sperms = [];
+      state.particles = [];
+      state.effects = [];
+
+      document.getElementById('lobbyModal').classList.add('hidden');
+      document.getElementById('resultModal').classList.add('hidden');
+      document.getElementById('hudStats').classList.remove('hidden');
+
+      // Center ovum pos
+      const cx = CANVAS.width / 2;
+      const cy = CANVAS.height / 2;
+
+      // Reset local player position
+      if (state.players[SENDER_ID]) {
+        state.players[SENDER_ID].x = cx + (Math.random() - 0.5) * 150;
+        state.players[SENDER_ID].y = cy + 130;
+      }
+      updateActionSkillButtonUI();
+    }
+
+    function spawnSperm() {
+      const cx = CANVAS.width / 2;
+      const cy = CANVAS.height / 2;
+      const spawnRadius = Math.max(CANVAS.width, CANVAS.height) * 0.65;
+      const angle = Math.random() * Math.PI * 2;
+      
+      const startX = cx + Math.cos(angle) * spawnRadius;
+      const startY = cy + Math.sin(angle) * spawnRadius;
+
+      // Difficulty speed scale as time drops
+      const speedScale = 1.0 + (60 - state.timeLeft) * 0.015;
+      const baseSpeed = (1.4 + Math.random() * 0.9) * speedScale;
+
+      const types = ['normal', 'normal', 'speedy', 'tank'];
+      const type = types[Math.floor(Math.random() * types.length)];
+
+      let hp = 1;
+      let radius = 18;
+      let spd = baseSpeed;
+
+      if (type === 'speedy') {
+        spd *= 1.45;
+        radius = 15;
+      } else if (type === 'tank') {
+        hp = 3;
+        radius = 26;
+        spd *= 0.75;
+      }
+
+      state.sperms.push({
+        id: 'sp_' + Math.random().toString(36).substring(2, 7),
+        x: startX,
+        y: startY,
+        angle: angle + Math.PI,
+        baseSpeed: spd,
+        speed: spd,
+        hp: hp,
+        maxHp: hp,
+        radius: radius,
+        type: type,
+        wigglePhase: Math.random() * Math.PI * 2,
+        tailLength: radius * 3.5,
+        slowTimer: 0
+      });
+    }
+
+    function updateSperms(dt) {
+      const cx = CANVAS.width / 2;
+      const cy = CANVAS.height / 2;
+      const ovumRadius = 60;
+      const barrierRadius = 92;
+
+      for (let i = state.sperms.length - 1; i >= 0; i--) {
+        const sp = state.sperms[i];
+
+        // Status effects (slow down)
+        if (sp.slowTimer > 0) {
+          sp.slowTimer -= dt;
+          sp.speed = sp.baseSpeed * 0.45;
+        } else {
+          sp.speed = sp.baseSpeed;
+        }
+
+        // Direct path towards ovum center
+        const dx = cx - sp.x;
+        const dy = cy - sp.y;
+        const dist = Math.hypot(dx, dy);
+        sp.angle = Math.atan2(dy, dx);
+
+        // Move
+        sp.x += Math.cos(sp.angle) * sp.speed;
+        sp.y += Math.sin(sp.angle) * sp.speed;
+        sp.wigglePhase += 0.28 * (sp.speed / sp.baseSpeed);
+
+        // Barrier collision
+        if (dist <= barrierRadius + sp.radius) {
+          if (state.ovumHealth > 0) {
+            // Hit shield barrier
+            state.ovumHealth = Math.max(0, state.ovumHealth - (sp.type === 'tank' ? 8 : 4));
+            createExplosion(sp.x, sp.y, '#38bdf8', 12);
+            // Squeeze knockback
+            sp.x -= Math.cos(sp.angle) * 35;
+            sp.y -= Math.sin(sp.angle) * 35;
+            sp.hp -= 1;
+            if (sp.hp <= 0) {
+              state.sperms.splice(i, 1);
+              continue;
+            }
+          } else if (dist <= ovumRadius) {
+            // REACHED FEMALE CORE: GAME OVER!
+            triggerGameOver(sp);
+            return;
+          }
+        }
+      }
+    }
+
+    function triggerLocalPlayerAction() {
+      const now = performance.now() / 1000;
+      const role = ROLES[state.myRole];
+      if (now - state.lastActionTime < role.cooldown) return;
+      state.lastActionTime = now;
+
+      const p = state.players[SENDER_ID];
+      if (!p) return;
+
+      // Broadcast action
+      publishMessage({
+        type: 'PLAYER_ACTION',
+        sender: SENDER_ID,
+        role: state.myRole,
+        x: p.x,
+        y: p.y
+      });
+
+      triggerPlayerSkillVisual(SENDER_ID, state.myRole, p.x, p.y);
+      if (state.isHost) {
+        applySkillToSperms(state.myRole, p.x, p.y);
+      }
+    }
+
+    function applySkillToSperms(roleType, x, y) {
+      const role = ROLES[roleType];
+      const r = role.radius;
+
+      if (roleType === 'slipper') {
+        // High damage direct swat
+        for (let i = state.sperms.length - 1; i >= 0; i--) {
+          const sp = state.sperms[i];
+          const dist = Math.hypot(sp.x - x, sp.y - y);
+          if (dist <= r + sp.radius) {
+            sp.hp -= 2;
+            createExplosion(sp.x, sp.y, '#f43f5e', 14);
+            // Swat pushback
+            const pushAngle = Math.atan2(sp.y - y, sp.x - x);
+            sp.x += Math.cos(pushAngle) * 70;
+            sp.y += Math.sin(pushAngle) * 70;
+            if (sp.hp <= 0) state.sperms.splice(i, 1);
+          }
+        }
+      } else if (roleType === 'acid') {
+        // Acid spray dissolves and slows
+        for (let i = state.sperms.length - 1; i >= 0; i--) {
+          const sp = state.sperms[i];
+          const dist = Math.hypot(sp.x - x, sp.y - y);
+          if (dist <= r + sp.radius) {
+            sp.hp -= 1;
+            sp.slowTimer = 3.5;
+            createExplosion(sp.x, sp.y, '#10b981', 8);
+            if (sp.hp <= 0) state.sperms.splice(i, 1);
+          }
+        }
+      } else if (roleType === 'repair') {
+        // Repair shield and push away nearby
+        state.ovumHealth = Math.min(state.ovumMaxHealth, state.ovumHealth + 12);
+        for (let i = state.sperms.length - 1; i >= 0; i--) {
+          const sp = state.sperms[i];
+          const dist = Math.hypot(sp.x - x, sp.y - y);
+          if (dist <= r) {
+            const pushAngle = Math.atan2(sp.y - y, sp.x - x);
+            sp.x += Math.cos(pushAngle) * 90;
+            sp.y += Math.sin(pushAngle) * 90;
+          }
+        }
+      } else if (roleType === 'vacuum') {
+        // Sucks in sperm and obliterates them
+        for (let i = state.sperms.length - 1; i >= 0; i--) {
+          const sp = state.sperms[i];
+          const dist = Math.hypot(sp.x - x, sp.y - y);
+          if (dist <= r + sp.radius) {
+            sp.hp = 0;
+            createExplosion(sp.x, sp.y, '#f59e0b', 16);
+            state.sperms.splice(i, 1);
+          }
+        }
+      }
+    }
+
+    function triggerPlayerSkillVisual(senderId, roleKey, x, y) {
+      const role = ROLES[roleKey];
+      state.effects.push({
+        role: roleKey,
+        x: x,
+        y: y,
+        radius: role.radius,
+        maxRadius: role.radius * 1.25,
+        alpha: 1.0,
+        color: role.color,
+        angle: Math.random() * Math.PI * 2
+      });
+    }
+
+    function createExplosion(x, y, color, count = 10) {
+      for (let i = 0; i < count; i++) {
+        const ang = Math.random() * Math.PI * 2;
+        const spd = 2 + Math.random() * 5;
+        state.particles.push({
+          x: x,
+          y: y,
+          vx: Math.cos(ang) * spd,
+          vy: Math.sin(ang) * spd,
+          color: color,
+          alpha: 1.0,
+          size: 3 + Math.random() * 4
+        });
+      }
+    }
+
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+      keys[e.key.toLowerCase()] = true;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        triggerLocalPlayerAction();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    let pointerTarget = null;
+    CANVAS.addEventListener('pointerdown', (e) => {
+      const rect = CANVAS.getBoundingClientRect();
+      pointerTarget = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      triggerLocalPlayerAction();
+    });
+    CANVAS.addEventListener('pointermove', (e) => {
+      if (e.buttons > 0) {
+        const rect = CANVAS.getBoundingClientRect();
+        pointerTarget = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      }
+    });
+    window.addEventListener('pointerup', () => { pointerTarget = null; });
+
+    document.getElementById('btnActionSkill').addEventListener('click', (e) => {
+      e.stopPropagation();
+      triggerLocalPlayerAction();
+    });
+
+    function updateLocalPlayerMovement(dt) {
+      const p = state.players[SENDER_ID];
+      if (!p) return;
+
+      const speed = 260; // px / sec
+      let dx = 0;
+      let dy = 0;
+
+      if (keys['w'] || keys['arrowup']) dy -= 1;
+      if (keys['s'] || keys['arrowdown']) dy += 1;
+      if (keys['a'] || keys['arrowleft']) dx -= 1;
+      if (keys['d'] || keys['arrowright']) dx += 1;
+
+      if (pointerTarget) {
+        const tdx = pointerTarget.x - p.x;
+        const tdy = pointerTarget.y - p.y;
+        const tdist = Math.hypot(tdx, tdy);
+        if (tdist > 10) {
+          dx = tdx / tdist;
+          dy = tdy / tdist;
+        }
+      }
+
+      if (dx !== 0 || dy !== 0) {
+        const len = Math.hypot(dx, dy);
+        p.x += (dx / len) * speed * dt;
+        p.y += (dy / len) * speed * dt;
+
+        // Keep inside screen
+        p.x = Math.max(30, Math.min(CANVAS.width - 30, p.x));
+        p.y = Math.max(30, Math.min(CANVAS.height - 30, p.y));
+
+        // Sync movement
+        if (Math.random() < 0.25) {
+          publishMessage({
+            type: 'PLAYER_MOVE',
+            sender: SENDER_ID,
+            x: Math.round(p.x),
+            y: Math.round(p.y)
+          });
+        }
+      }
+    }
+
+    function triggerGameOver(killerSperm) {
+      state.gameRunning = false;
+      showResult(false, killerSperm);
+      if (state.isHost) {
+        publishMessage({
+          type: 'HOST_GAME_STATE',
+          sender: SENDER_ID,
+          status: 'LOSE',
+          killerSperm: killerSperm,
+          ovumHealth: 0,
+          timeLeft: state.timeLeft,
+          sperms: []
+        });
+      }
+    }
+
+    function triggerGameWin() {
+      state.gameRunning = false;
+      showResult(true);
+      if (state.isHost) {
+        publishMessage({
+          type: 'HOST_GAME_STATE',
+          sender: SENDER_ID,
+          status: 'WIN',
+          ovumHealth: state.ovumHealth,
+          timeLeft: 0,
+          sperms: []
+        });
+      }
+    }
+
+    function showResult(isWin, killer = null) {
+      const modal = document.getElementById('resultModal');
+      const card = document.getElementById('resultCard');
+      const icon = document.getElementById('resultIcon');
+      const title = document.getElementById('resultTitle');
+      const subtitle = document.getElementById('resultSubtitle');
+      const victimBox = document.getElementById('resultVictimContainer');
+      const victimC = document.getElementById('resultVictimCanvas');
+
+      modal.classList.remove('hidden');
+
+      if (isWin) {
+        card.className = 'comic-box bg-slate-900 border-4 border-yellow-400 w-full max-w-md rounded-2xl p-6 text-center text-white relative';
+        icon.innerText = '🛡️✨';
+        title.className = 'title-font text-3xl md:text-4xl text-yellow-300 text-shadow-pop mb-2';
+        title.innerText = '子宮防衛 完了！';
+        subtitle.innerText = '「今期はお見送りとなりました！防衛軍の完全勝利！」';
+        victimBox.classList.add('hidden');
+      } else {
+        card.className = 'comic-box bg-slate-950 border-4 border-pink-500 w-full max-w-md rounded-2xl p-6 text-center text-white relative';
+        icon.innerText = '👶💥';
+        title.className = 'title-font text-3xl md:text-4xl text-pink-400 text-shadow-pop mb-2';
+        title.innerText = '生命の神秘、大勝利！';
+        subtitle.innerText = '防衛軍の敗北… 1匹のオスライオンが卵子に到達！';
+        victimBox.classList.remove('hidden');
+
+        // Draw portrait of triumphant sperm
+        const ctxV = victimC.getContext('2d');
+        ctxV.clearRect(0, 0, 80, 80);
+        drawCircleCroppedImage(ctxV, images.maleLion, 40, 40, 36, '#eab308', 4);
+      }
+    }
+
+    document.getElementById('btnRestartGame').addEventListener('click', () => {
+      document.getElementById('resultModal').classList.add('hidden');
+      document.getElementById('lobbyModal').classList.remove('hidden');
+      document.getElementById('hudStats').classList.add('hidden');
+      state.gameRunning = false;
+    });
+
+    function render() {
+      CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
+
+      const cx = CANVAS.width / 2;
+      const cy = CANVAS.height / 2;
+
+      // 1. Bio Grid & Pulsing Uterine environment
+      drawBiologicalBackground(CTX, cx, cy);
+
+      // 2. Center Female Lion (Ovum & Zona Pellucida Barrier)
+      drawOvum(CTX, cx, cy);
+
+      // 3. Sperm Swarm (Male Lion Face + Wiggling Flagellum)
+      drawSperms(CTX);
+
+      // 4. Visual effects & Ability bursts
+      drawSkillEffects(CTX);
+
+      // 5. Active Players
+      drawPlayers(CTX);
+
+      // 6. Floating Particles
+      drawParticles(CTX);
+    }
+
+    function drawBiologicalBackground(ctx, cx, cy) {
+      // Soft organic glow pulses
+      const pulse = Math.sin(performance.now() * 0.002) * 20;
+      const gradient = ctx.createRadialGradient(cx, cy, 50, cx, cy, Math.max(CANVAS.width, CANVAS.height) * 0.7);
+      gradient.addColorStop(0, 'rgba(88, 28, 135, 0.45)');
+      gradient.addColorStop(0.6, 'rgba(30, 10, 60, 0.7)');
+      gradient.addColorStop(1, 'rgba(10, 2, 20, 0.95)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, CANVAS.width, CANVAS.height);
+
+      // Floating bio cells / aesthetic dots
+      ctx.save();
+      ctx.fillStyle = 'rgba(236, 72, 153, 0.08)';
+      for (let i = 0; i < 8; i++) {
+        const offsetAng = (i * Math.PI) / 4 + performance.now() * 0.0003;
+        const r = 240 + pulse * 1.5;
+        ctx.beginPath();
+        ctx.arc(cx + Math.cos(offsetAng) * r, cy + Math.sin(offsetAng) * r, 30, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawOvum(ctx, cx, cy) {
+      const ovumRadius = 60;
+      const barrierRadius = 92;
+
+      // Zona Pellucida (Transparent Shield Barrier)
+      if (state.ovumHealth > 0) {
+        ctx.save();
+        const shieldAlpha = Math.max(0.2, state.ovumHealth / 100);
+        ctx.beginPath();
+        ctx.arc(cx, cy, barrierRadius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(56, 189, 248, ${shieldAlpha * 0.25})`;
+        ctx.fill();
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = `rgba(56, 189, 248, ${shieldAlpha})`;
+        ctx.setLineDash([8, 6]);
+        ctx.lineDashOffset = -performance.now() * 0.02;
+        ctx.stroke();
+
+        // Hex glow ring
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(244, 114, 182, 0.4)';
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.arc(cx, cy, barrierRadius + 6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Female Lion Face (The Nucleus of the Ovum)
+      drawCircleCroppedImage(ctx, images.femaleLion, cx, cy, ovumRadius, '#ec4899', 6);
+
+      // Crown / Bio aura
+      ctx.save();
+      ctx.font = 'bold 12px "M PLUS Rounded 1c"';
+      ctx.fillStyle = '#fbcfe8';
+      ctx.textAlign = 'center';
+      ctx.fillText('メスライオン卵子 (核)', cx, cy + ovumRadius + 22);
+      ctx.restore();
+    }
+
+    function drawSperms(ctx) {
+      for (let sp of state.sperms) {
+        ctx.save();
+
+        // 1. Draw Wiggling Sperm Tail (Flagellum)
+        ctx.beginPath();
+        const tailSegments = 7;
+        const tailStep = sp.tailLength / tailSegments;
+        let prevX = sp.x;
+        let prevY = sp.y;
+        ctx.moveTo(prevX, prevY);
+
+        for (let j = 1; j <= tailSegments; j++) {
+          const segDist = j * tailStep;
+          const wave = Math.sin(sp.wigglePhase + j * 0.8) * (j * 3.5);
+          // Tail extends backwards opposite to sp.angle
+          const backAngle = sp.angle + Math.PI;
+          const perpAngle = backAngle + Math.PI / 2;
+
+          const segX = sp.x + Math.cos(backAngle) * segDist + Math.cos(perpAngle) * wave;
+          const segY = sp.y + Math.sin(backAngle) * segDist + Math.sin(perpAngle) * wave;
+          ctx.lineTo(segX, segY);
+        }
+        ctx.strokeStyle = sp.slowTimer > 0 ? '#10b981' : '#fde047';
+        ctx.lineWidth = Math.max(2, sp.radius * 0.25);
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        // 2. Draw Male Lion Head (Aspect-Fit circle)
+        const borderColor = sp.type === 'tank' ? '#ef4444' : (sp.slowTimer > 0 ? '#10b981' : '#eab308');
+        drawCircleCroppedImage(ctx, images.maleLion, sp.x, sp.y, sp.radius, borderColor, 3);
+
+        // HP bar for tougher sperms
+        if (sp.maxHp > 1) {
+          const bw = sp.radius * 1.6;
+          const bh = 4;
+          const bx = sp.x - bw / 2;
+          const by = sp.y - sp.radius - 8;
+          ctx.fillStyle = '#000';
+          ctx.fillRect(bx, by, bw, bh);
+          ctx.fillStyle = '#22c55e';
+          ctx.fillRect(bx, by, bw * (sp.hp / sp.maxHp), bh);
+        }
+
+        ctx.restore();
+      }
+    }
+
+    function drawSkillEffects(ctx) {
+      for (let i = state.effects.length - 1; i >= 0; i--) {
+        const ef = state.effects[i];
+        ctx.save();
+        ctx.globalAlpha = ef.alpha;
+
+        if (ef.role === 'slipper') {
+          // Giant Comic Slipper Smacking Down
+          ctx.save();
+          ctx.translate(ef.x, ef.y);
+          ctx.rotate(ef.angle);
+          ctx.fillStyle = '#f43f5e';
+          ctx.beginPath();
+          ctx.roundRect(-25, -60, 50, 120, 25);
+          ctx.fill();
+          ctx.lineWidth = 4;
+          ctx.strokeStyle = '#000';
+          ctx.stroke();
+          // Slipper strap
+          ctx.fillStyle = '#fb7185';
+          ctx.beginPath();
+          ctx.roundRect(-20, -10, 40, 20, 8);
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+
+          // Shockwave ring
+          ctx.beginPath();
+          ctx.arc(ef.x, ef.y, ef.radius * (1 - ef.alpha + 0.5), 0, Math.PI * 2);
+          ctx.lineWidth = 5;
+          ctx.strokeStyle = '#f43f5e';
+          ctx.stroke();
+
+        } else if (ef.role === 'acid') {
+          // Acid cloud
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.45)';
+          ctx.beginPath();
+          ctx.arc(ef.x, ef.y, ef.radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = '#34d399';
+          ctx.stroke();
+
+        } else if (ef.role === 'repair') {
+          // Nano Bio-Repair pulse
+          ctx.beginPath();
+          ctx.arc(ef.x, ef.y, ef.radius, 0, Math.PI * 2);
+          ctx.strokeStyle = '#06b6d4';
+          ctx.lineWidth = 4;
+          ctx.stroke();
+          ctx.fillStyle = 'rgba(6, 182, 212, 0.2)';
+          ctx.fill();
+
+        } else if (ef.role === 'vacuum') {
+          // Vortex spiral
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(ef.x, ef.y, ef.radius * ef.alpha, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+
+        ef.alpha -= 0.05;
+        if (ef.alpha <= 0) {
+          state.effects.splice(i, 1);
+        }
+      }
+    }
+
+    function drawPlayers(ctx) {
+      for (let id in state.players) {
+        const p = state.players[id];
+        const role = ROLES[p.role] || ROLES.slipper;
+        const isMe = (p.id === SENDER_ID);
+
+        ctx.save();
+        // Shadow
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.beginPath();
+        ctx.ellipse(p.x, p.y + 16, 18, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Player Avatar Token
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
+        ctx.fillStyle = role.color;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = isMe ? '#fbbf24' : '#000';
+        ctx.stroke();
+
+        // Icon inside token
+        ctx.fillStyle = '#fff';
+        ctx.font = '900 13px "Font Awesome 6 Free"';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        // Approximate unicode for quick crisp drawing or symbol
+        ctx.font = 'bold 13px sans-serif';
+        const roleInitial = p.role === 'slipper' ? '🩴' : (p.role === 'acid' ? '🧪' : (p.role === 'repair' ? '🛡️' : '🌪️'));
+        ctx.fillText(roleInitial, p.x, p.y);
+
+        // Player Name Tag
+        ctx.font = 'bold 11px "M PLUS Rounded 1c"';
+        ctx.fillStyle = isMe ? '#fef08a' : '#fff';
+        ctx.textAlign = 'center';
+        ctx.fillText(p.name, p.x, p.y - 25);
+
+        ctx.restore();
+      }
+    }
+
+    function drawParticles(ctx) {
+      for (let i = state.particles.length - 1; i >= 0; i--) {
+        const pt = state.particles[i];
+        ctx.save();
+        ctx.globalAlpha = pt.alpha;
+        ctx.fillStyle = pt.color;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.alpha -= 0.035;
+        if (pt.alpha <= 0) {
+          state.particles.splice(i, 1);
+        }
+      }
+    }
+
+    let lastTimestamp = performance.now();
+    function gameLoop(currentTimestamp) {
+      const dt = Math.min(0.1, (currentTimestamp - lastTimestamp) / 1000);
+      lastTimestamp = currentTimestamp;
+
+      if (state.gameRunning) {
+        // Player input update
+        updateLocalPlayerMovement(dt);
+
+        // Host authoritative simulation
+        if (state.isHost) {
+          // Timer
+          state.timeLeft -= dt;
+          if (state.timeLeft <= 0) {
+            triggerGameWin();
+          }
+
+          // Spawn sperms based on progressive pacing
+          state.spawnTimer += dt;
+          const spawnInterval = Math.max(0.4, 1.4 - (60 - state.timeLeft) * 0.02);
+          if (state.spawnTimer >= spawnInterval) {
+            state.spawnTimer = 0;
+            spawnSperm();
+          }
+
+          // Move sperms and handle collisions
+          updateSperms(dt);
+
+          // Sync state to guests at ~10Hz
+          state.syncTimer += dt;
+          if (state.syncTimer >= 0.1) {
+            state.syncTimer = 0;
+            publishMessage({
+              type: 'HOST_GAME_STATE',
+              sender: SENDER_ID,
+              status: 'RUNNING',
+              ovumHealth: Math.round(state.ovumHealth),
+              timeLeft: Math.ceil(state.timeLeft),
+              sperms: state.sperms
+            });
+          }
+        }
+
+        // Update HUD
+        document.getElementById('hudTimer').innerHTML = `${Math.ceil(state.timeLeft)}<span class="text-sm">s</span>`;
+        const healthPercent = Math.max(0, Math.min(100, (state.ovumHealth / state.ovumMaxHealth) * 100));
+        document.getElementById('hudShieldBar').style.width = `${healthPercent}%`;
+        document.getElementById('hudShieldText').innerText = `${Math.round(healthPercent)}%`;
+
+        // Cooldown label update
+        const role = ROLES[state.myRole];
+        const elapsed = (performance.now() / 1000) - state.lastActionTime;
+        const cdLeft = Math.max(0, role.cooldown - elapsed);
+        const cdLabel = document.getElementById('skillCdLabel');
+        if (cdLeft > 0) {
+          cdLabel.innerText = cdLeft.toFixed(1) + 's';
+          cdLabel.className = 'text-[9px] text-red-600 font-bold';
+        } else {
+          cdLabel.innerText = 'READY';
+          cdLabel.className = 'text-[9px] text-green-800 font-bold';
+        }
+      }
+
+      render();
+      requestAnimationFrame(gameLoop);
+    }
+
+    window.onload = function() {
+      requestAnimationFrame(gameLoop);
+    };
+  </script>
+</body>
+</html>
