@@ -20,19 +20,20 @@
       user-select: none;
       -webkit-user-select: none;
       overflow: hidden;
+      background-color: #080014;
     }
     .title-font {
       font-family: 'Mochiy Pop One', cursive;
     }
     .bg-bio {
-      background: radial-gradient(circle at center, #2e0854 0%, #15002a 60%, #080014 100%);
+      background: radial-gradient(circle at center, #230444 0%, #110022 65%, #070010 100%);
     }
     .text-shadow-pop {
       text-shadow: 3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000;
     }
     .comic-box {
-      border: 4px solid #000;
-      box-shadow: 5px 5px 0px #000;
+      border: 3px solid #000;
+      box-shadow: 4px 4px 0px #000;
     }
     .comic-btn {
       border: 3px solid #000;
@@ -43,16 +44,20 @@
       transform: translate(2px, 2px);
       box-shadow: 1px 1px 0px #000;
     }
-    .role-selected {
-      border-color: #f43f5e !important;
-      background-color: rgba(244, 63, 94, 0.25) !important;
-      box-shadow: 0 0 12px rgba(244, 63, 94, 0.5);
+    .char-card-selected {
+      border-color: #f59e0b !important;
+      background-color: rgba(245, 158, 11, 0.22) !important;
+      box-shadow: 0 0 14px rgba(245, 158, 11, 0.5) !important;
     }
+    .rarity-common { border-color: #94a3b8; color: #f1f5f9; }
+    .rarity-rare { border-color: #38bdf8; color: #7dd3fc; }
+    .rarity-sr { border-color: #fbbf24; color: #fde047; }
   </style>
 </head>
 <body class="bg-bio text-white h-screen w-screen overflow-hidden flex flex-col justify-between">
 
-  <header id="gameHeader" class="w-full px-3 md:px-5 py-2 flex items-center justify-between z-20 border-b-2 border-pink-500/30 bg-black/70 backdrop-blur-md">
+  <!-- Header HUD -->
+  <header id="gameHeader" class="w-full px-3 md:px-5 py-2 flex items-center justify-between z-20 border-b-2 border-pink-500/30 bg-black/80 backdrop-blur-md">
     <div class="flex items-center space-x-2 md:space-x-3">
       <div class="bg-yellow-400 text-black px-2.5 py-1 rounded-full font-black text-xs md:text-sm tracking-wider comic-box flex items-center space-x-1.5">
         <span class="animate-pulse">🛡️</span> <span>SDF: 子宮防衛軍</span>
@@ -61,6 +66,10 @@
         <span class="text-gray-400">ROOM:</span>
         <span id="displayRoomCode" class="font-mono font-black text-yellow-300">----</span>
         <button id="btnCopyBadge" class="text-yellow-400 hover:text-white" title="コードをコピー"><i class="fa-solid fa-copy"></i></button>
+      </div>
+      <!-- Coin Counter in Header -->
+      <div class="bg-amber-950/80 px-2.5 py-1 rounded-lg border border-amber-500/70 text-amber-300 text-xs font-black flex items-center space-x-1">
+        <span>🪙</span> <span id="headerCoinCount">0</span>
       </div>
     </div>
 
@@ -80,11 +89,14 @@
     </div>
 
     <div class="flex items-center space-x-1.5 md:space-x-2">
+      <button id="btnOpenShop" class="comic-btn bg-amber-500 hover:bg-amber-400 text-black text-xs px-2.5 py-1.5 rounded-lg font-black">
+        <i class="fa-solid fa-store"></i> <span class="hidden sm:inline">兵舎＆ショップ</span>
+      </button>
       <button id="btnSoundToggle" class="comic-btn bg-slate-800 hover:bg-slate-700 text-yellow-300 text-xs px-2.5 py-1.5 rounded-lg font-bold" title="サウンド切り替え">
         <i id="soundIcon" class="fa-solid fa-volume-high"></i>
       </button>
-      <button id="btnToggleSettings" class="comic-btn bg-pink-600 hover:bg-pink-500 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold">
-        <i class="fa-solid fa-camera"></i> <span class="hidden sm:inline">写真アサイン</span>
+      <button id="btnToggleSettings" class="comic-btn bg-pink-600 hover:bg-pink-500 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold" title="写真設定">
+        <i class="fa-solid fa-camera"></i> <span class="hidden sm:inline">写真設定</span>
       </button>
       <button id="btnLeaveRoom" class="comic-btn bg-red-700 hover:bg-red-600 text-white text-xs px-2.5 py-1.5 rounded-lg font-bold hidden">
         <i class="fa-solid fa-right-from-bracket"></i> <span class="hidden sm:inline">退出</span>
@@ -92,23 +104,23 @@
     </div>
   </header>
 
-  <main class="flex-1 relative w-full h-full overflow-hidden flex items-center justify-center">
+  <main class="flex-1 relative w-full h-full overflow-hidden flex items-center justify-center bg-black">
     <canvas id="gameCanvas" class="w-full h-full block cursor-crosshair"></canvas>
 
-    <!-- Mobile / On-screen Skill Button HUD -->
+    <!-- Mobile / On-screen Control Instructions -->
     <div id="inGameControls" class="hidden absolute bottom-4 left-4 right-4 flex justify-between items-end pointer-events-none z-20">
-      <div class="bg-black/70 backdrop-blur-md border border-white/20 px-3 py-2 rounded-xl text-[11px] text-gray-300 pointer-events-auto select-none shadow-lg">
-        <span class="text-yellow-400 font-bold"><i class="fa-solid fa-gamepad"></i> 移動:</span> WASD / 矢印 / タップ移動<br>
-        <span class="text-cyan-400 font-bold"><i class="fa-solid fa-bolt"></i> 特技:</span> SPACEキー / ボタン
+      <div class="bg-black/75 backdrop-blur-md border border-white/20 px-3 py-2 rounded-xl text-[11px] text-gray-300 pointer-events-auto select-none shadow-lg">
+        <span class="text-yellow-400 font-bold"><i class="fa-solid fa-gamepad"></i> 移動:</span> WASD / 矢印キー<br>
+        <span class="text-cyan-400 font-bold"><i class="fa-solid fa-crosshairs"></i> 照準 & 攻撃:</span> マウス向き・クリック (機銃は長押し可)
       </div>
 
-      <button id="btnActionSkill" class="comic-btn bg-gradient-to-r from-yellow-400 to-orange-500 text-black active:scale-95 font-black w-24 h-24 md:w-28 md:h-28 rounded-full pointer-events-auto flex flex-col items-center justify-center border-4 border-black shadow-2xl transition">
-        <i id="skillIcon" class="fa-solid fa-shoe-prints text-2xl md:text-3xl mb-0.5"></i>
-        <span id="skillName" class="text-xs font-bold leading-tight">特技発動</span>
-        <span id="skillCdLabel" class="text-[10px] text-green-950 font-black">READY</span>
-      </button>
+      <div class="bg-black/75 backdrop-blur-md border border-yellow-500/40 px-3.5 py-2 rounded-xl text-center pointer-events-auto">
+        <div class="text-[10px] text-gray-400">装備中兵種</div>
+        <div id="hudCurrentCharName" class="text-xs font-black text-yellow-300">素手兵</div>
+      </div>
     </div>
 
+    <!-- VIEW: TITLE (Create or Join) -->
     <div id="viewTitle" class="absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-4 z-30">
       <div class="comic-box bg-slate-900 border-pink-500 w-full max-w-lg rounded-2xl p-5 md:p-7 text-white relative">
         <div class="text-center mb-5">
@@ -126,7 +138,7 @@
           <input type="text" id="inputPlayerName" maxlength="10" value="隊員01" class="w-full bg-slate-800 border-2 border-slate-600 rounded-xl px-3 py-2 text-sm font-bold focus:border-pink-500 focus:outline-none">
         </div>
 
-        <!-- Distinct Host and Join Actions -->
+        <!-- Create & Join Separated Action Cards -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
           <div class="bg-slate-800/80 p-3.5 rounded-xl border border-yellow-500/30 flex flex-col justify-between">
             <div>
@@ -162,10 +174,9 @@
       </div>
     </div>
 
+    <!-- VIEW: LOBBY -->
     <div id="viewLobby" class="hidden absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 md:p-4 z-30">
       <div class="comic-box bg-slate-900 border-pink-500 w-full max-w-2xl rounded-2xl p-4 md:p-6 text-white relative max-h-[96vh] overflow-y-auto">
-        
-        <!-- Lobby Header -->
         <div class="flex flex-wrap items-center justify-between border-b border-slate-800 pb-3 mb-3 gap-2">
           <div>
             <span class="text-[10px] bg-purple-900 text-purple-200 px-2 py-0.5 rounded font-black">作戦待機ロビー</span>
@@ -185,7 +196,7 @@
           </div>
         </div>
 
-        <!-- Member list roster (Up to 8 players) -->
+        <!-- Member Roster -->
         <div class="mb-4">
           <div class="flex justify-between items-center mb-1.5">
             <span class="text-xs font-bold text-gray-300">
@@ -194,82 +205,29 @@
             <span id="lobbyHostIndicator" class="text-xs text-yellow-400 font-bold">一般隊員として待機中</span>
           </div>
           <div id="lobbyMemberList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 min-h-[58px] p-2 bg-slate-800/60 rounded-xl border border-slate-700/80">
-            <!-- Member cards dynamically inserted -->
           </div>
         </div>
 
-        <div class="mb-4">
-          <label class="block text-xs font-bold text-yellow-300 mb-1.5">
-            役職を選択せよ (自由選択・同一役職の重複も可能！)
-          </label>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left" id="lobbyRoleGrid">
-            
-            <!-- Role 1: Slipper Striker -->
-            <button type="button" data-role="slipper" class="role-btn comic-box bg-slate-800 p-2.5 rounded-xl text-left hover:bg-rose-950/40 transition">
-              <div class="flex items-start space-x-2.5">
-                <div class="bg-rose-600 text-white p-2 rounded-lg text-lg"><i class="fa-solid fa-shoe-prints"></i></div>
-                <div>
-                  <div class="text-xs font-black text-rose-300">① スリッパ強襲兵</div>
-                  <div class="text-[10px] text-gray-300 leading-snug mt-0.5">
-                    <strong>最速の機動力！</strong> 近接バチンスマッシュで精子を一撃撲滅＆超強力ノックバック。<br>
-                    <span class="text-rose-400 font-bold">機動性: ★★★ / CD: 0.35s</span>
-                  </div>
-                </div>
-              </div>
+        <!-- Quick Class Selection in Lobby -->
+        <div class="mb-4 bg-slate-800/70 p-3 rounded-xl border border-slate-700">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold text-yellow-300">現在出撃する兵種を選択</span>
+            <button id="btnLobbyOpenShop" class="text-xs text-amber-400 hover:underline font-bold">
+              <i class="fa-solid fa-store mr-1"></i>ショップで開放＆バッジ強化
             </button>
-
-            <!-- Role 2: Acid Chemical -->
-            <button type="button" data-role="acid" class="role-btn comic-box bg-slate-800 p-2.5 rounded-xl text-left hover:bg-emerald-950/40 transition">
-              <div class="flex items-start space-x-2.5">
-                <div class="bg-emerald-600 text-white p-2 rounded-lg text-lg"><i class="fa-solid fa-spray-can"></i></div>
-                <div>
-                  <div class="text-xs font-black text-emerald-300">② 強酸ケミカル兵</div>
-                  <div class="text-[10px] text-gray-300 leading-snug mt-0.5">
-                    <strong>広域持続トラップ！</strong> 強酸の毒霧エリアを展開。踏んだ精子の速度を70%激減させ継続溶解。<br>
-                    <span class="text-emerald-400 font-bold">足止め: ★★★ / CD: 1.2s</span>
-                  </div>
-                </div>
-              </div>
-            </button>
-
-            <!-- Role 3: Zona Barrier Engineer (Re-balanced) -->
-            <button type="button" data-role="repair" class="role-btn comic-box bg-slate-800 p-2.5 rounded-xl text-left hover:bg-cyan-950/40 transition">
-              <div class="flex items-start space-x-2.5">
-                <div class="bg-cyan-600 text-white p-2 rounded-lg text-lg"><i class="fa-solid fa-cubes"></i></div>
-                <div>
-                  <div class="text-xs font-black text-cyan-300">③ 透明帯リペア工兵 (調整版)</div>
-                  <div class="text-[10px] text-gray-300 leading-snug mt-0.5">
-                    <strong>職人防壁！</strong> 精子を弾き返す「ゼリー状臨時バリケード」を設置。さらにバリアを+15%修復。<br>
-                    <span class="text-cyan-400 font-bold">防壁構築 / CD: 7.0s (回復弱体化調整)</span>
-                  </div>
-                </div>
-              </div>
-            </button>
-
-            <!-- Role 4: Dyson Vortex Bazooka -->
-            <button type="button" data-role="vacuum" class="role-btn comic-box bg-slate-800 p-2.5 rounded-xl text-left hover:bg-amber-950/40 transition">
-              <div class="flex items-start space-x-2.5">
-                <div class="bg-amber-600 text-white p-2 rounded-lg text-lg"><i class="fa-solid fa-tornado"></i></div>
-                <div>
-                  <div class="text-xs font-black text-yellow-300">④ ダイソン吸引バズーカ兵</div>
-                  <div class="text-[10px] text-gray-300 leading-snug mt-0.5">
-                    <strong>重力兵器！</strong> 指定位置にブラックホールを射出し、密集した大群を一網打尽に吸い込み爆破。<br>
-                    <span class="text-amber-400 font-bold">集敵殲滅: ★★★ / CD: 2.5s</span>
-                  </div>
-                </div>
-              </div>
-            </button>
+          </div>
+          <div id="lobbyCharRoster" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <!-- Dynamically populated character cards -->
           </div>
         </div>
 
+        <!-- Start Game Button (Simple '作戦開始' label) -->
         <div class="pt-2">
-          <!-- Host Launch Action -->
-          <button id="btnHostStartCountdown" class="comic-btn w-full bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white font-black text-lg py-3.5 rounded-xl hidden flex items-center justify-center space-x-2 animate-pulse shadow-lg">
+          <button id="btnHostStartCountdown" class="comic-btn w-full bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-400 hover:to-rose-500 text-white font-black text-xl py-3.5 rounded-xl hidden flex items-center justify-center space-x-2 animate-pulse shadow-lg">
             <i class="fa-solid fa-rocket text-xl"></i>
-            <span>作戦開始 (3-2-1 カウントダウンへ)</span>
+            <span>作戦開始</span>
           </button>
           
-          <!-- Guest Waiting Notice -->
           <div id="guestWaitingBanner" class="text-center text-xs md:text-sm text-yellow-300 font-bold py-3 bg-slate-800/90 rounded-xl border border-yellow-500/40 flex items-center justify-center space-x-2">
             <i class="fa-solid fa-hourglass-half animate-spin text-base"></i>
             <span>指令長(ホスト)が作戦を開始するのを待機しています...</span>
@@ -278,6 +236,7 @@
       </div>
     </div>
 
+    <!-- VIEW: COUNTDOWN (3, 2, 1, START) -->
     <div id="viewCountdown" class="hidden absolute inset-0 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center z-40 pointer-events-none">
       <div class="text-pink-400 text-sm md:text-base font-black tracking-widest uppercase mb-2 animate-bounce">
         SHIKYUU DEFENSE FORCE - MISSION READY
@@ -290,6 +249,68 @@
       </div>
     </div>
 
+    <!-- MODAL: SHOP & BARRACKS (8 Characters + Gacha Badges) -->
+    <div id="shopModal" class="hidden absolute inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 md:p-4 z-50">
+      <div class="comic-box bg-slate-900 border-amber-400 w-full max-w-3xl rounded-2xl p-4 md:p-6 text-white max-h-[92vh] flex flex-col">
+        <div class="flex justify-between items-center border-b border-slate-700 pb-2 mb-3">
+          <div class="flex items-center space-x-2">
+            <span class="text-xl">🏪</span>
+            <h2 class="title-font text-lg md:text-xl text-amber-300">防衛軍 兵舎＆ショップ</h2>
+            <div class="bg-amber-950 px-2 py-0.5 rounded text-amber-300 text-xs font-black border border-amber-500/50">
+              🪙 所持コイン: <span id="shopCoinDisplay">0</span>
+            </div>
+          </div>
+          <button id="btnCloseShop" class="text-gray-400 hover:text-white text-2xl font-black">&times;</button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-3 flex-1 overflow-y-auto pr-1">
+          <!-- Characters List (Left column) -->
+          <div class="md:col-span-7 space-y-2" id="shopCharList">
+            <!-- 8 Characters inserted dynamically -->
+          </div>
+
+          <!-- Character Detail & Badge Gacha (Right column) -->
+          <div class="md:col-span-5 bg-slate-800/90 p-3.5 rounded-xl border border-slate-700 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center space-x-2 mb-1.5">
+                <span id="detailCharIcon" class="text-2xl">👊</span>
+                <div>
+                  <h3 id="detailCharName" class="font-black text-sm text-yellow-300">素手兵</h3>
+                  <div id="detailCharRole" class="text-[10px] text-gray-300">近接ビンタ・パンチ格闘</div>
+                </div>
+              </div>
+              <p id="detailCharDesc" class="text-xs text-gray-300 leading-relaxed mb-3">
+                最初から使える基本の素手防衛兵。素早いパンチを繰り出す。
+              </p>
+
+              <!-- Badges slots (3 slots per character) -->
+              <div class="border-t border-slate-700 pt-2 mb-3">
+                <div class="flex justify-between items-center mb-1.5">
+                  <span class="text-xs font-black text-cyan-300"><i class="fa-solid fa-shield-halved mr-1"></i>装着バッジ (3枠)</span>
+                </div>
+                <div class="grid grid-cols-3 gap-1.5" id="detailBadgeSlots">
+                  <!-- 3 badge cards -->
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-2 pt-2 border-t border-slate-700">
+              <!-- Badge Gacha Button (Roll all 3 badges) -->
+              <button id="btnGachaBadges" class="comic-btn w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs py-2 rounded-xl flex items-center justify-center space-x-1.5">
+                <i class="fa-solid fa-dice text-sm"></i>
+                <span>バッジ3枠一括ガチャ (50コイン)</span>
+              </button>
+
+              <button id="btnEquipOrUnlockChar" class="comic-btn w-full bg-yellow-400 hover:bg-yellow-300 text-black font-black text-xs py-2.5 rounded-xl">
+                この兵種で出撃する
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: PHOTO ASSIGN SETTINGS -->
     <div id="settingsModal" class="hidden absolute inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
       <div class="comic-box bg-slate-900 border-cyan-400 w-full max-w-lg rounded-2xl p-5 text-white">
         <div class="flex justify-between items-center mb-2">
@@ -297,7 +318,7 @@
           <button id="btnCloseSettings" class="text-gray-400 hover:text-white text-2xl font-bold">&times;</button>
         </div>
         <p class="text-xs text-gray-300 mb-3 leading-relaxed">
-          アップロードした写真はどんなサイズ・比率でも<strong>中央正方形に自動クロップ</strong>され、歪みなく円形にトリミングされます。
+          アップロードした写真はどんなサイズ・比率でも<strong>中央正方形に自動クロップ</strong>され、歪みなく円形に描画されます。
         </p>
 
         <!-- Female Lion (Ovum) -->
@@ -329,12 +350,17 @@
       </div>
     </div>
 
+    <!-- MODAL: RESULT -->
     <div id="resultModal" class="hidden absolute inset-0 bg-black/90 backdrop-blur-lg flex items-center justify-center p-4 z-50">
       <div id="resultCard" class="comic-box bg-slate-900 border-4 w-full max-w-md rounded-2xl p-6 text-center text-white relative">
         <div id="resultIcon" class="text-6xl mb-2">🎉</div>
         <h2 id="resultTitle" class="title-font text-3xl md:text-4xl text-shadow-pop mb-1">防衛成功！</h2>
-        <p id="resultSubtitle" class="text-sm font-bold text-pink-200 mb-4">今期はお見送りとなりました！</p>
+        <p id="resultSubtitle" class="text-sm font-bold text-pink-200 mb-2">今期はお見送りとなりました！</p>
         
+        <div class="bg-amber-950/80 p-2.5 rounded-xl border border-amber-500/70 mb-4 inline-block">
+          <span class="text-xs font-black text-amber-300">獲得コイン: +<span id="resultCoinEarned">0</span> 🪙 (所持: <span id="resultTotalCoin">0</span>)</span>
+        </div>
+
         <div id="resultVictimContainer" class="hidden mb-4 p-3 bg-pink-950/70 rounded-xl border border-pink-500 flex flex-col items-center">
           <span class="text-xs text-yellow-300 font-black mb-1">【突破した栄光のオスライオン精子】</span>
           <canvas id="resultVictimCanvas" width="84" height="84" class="rounded-full border-3 border-yellow-400 mb-1.5 shadow-lg"></canvas>
@@ -348,7 +374,6 @@
     </div>
   </main>
 
-  <!-- JAVASCRIPT GAME ENGINE -->
   <script>
     class SoundFX {
       constructor() {
@@ -373,11 +398,11 @@
         osc.type = 'sine';
         osc.frequency.setValueAtTime(880, t);
         gain.gain.setValueAtTime(0.3, t);
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(t);
-        osc.stop(t + 0.12);
+        osc.stop(t + 0.1);
       }
       playStart() {
         if (this.muted) return;
@@ -396,69 +421,118 @@
           osc.stop(t + idx * 0.05 + 0.3);
         });
       }
-      playSmash() {
-        if (this.muted) return;
-        this.init();
-        const t = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(160, t);
-        osc.frequency.exponentialRampToValueAtTime(25, t + 0.18);
-        gain.gain.setValueAtTime(0.5, t);
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.18);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(t);
-        osc.stop(t + 0.18);
-      }
-      playAcid() {
+      playPunch() {
         if (this.muted) return;
         this.init();
         const t = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(450, t);
-        osc.frequency.linearRampToValueAtTime(180, t + 0.25);
-        gain.gain.setValueAtTime(0.2, t);
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.25);
+        osc.frequency.setValueAtTime(180, t);
+        osc.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+        gain.gain.setValueAtTime(0.4, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(t);
-        osc.stop(t + 0.25);
+        osc.stop(t + 0.12);
       }
-      playBarricade() {
-        if (this.muted) return;
-        this.init();
-        const t = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(320, t);
-        osc.frequency.exponentialRampToValueAtTime(640, t + 0.2);
-        gain.gain.setValueAtTime(0.3, t);
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-        osc.start(t);
-        osc.stop(t + 0.2);
-      }
-      playBlackhole() {
+      playStab() {
         if (this.muted) return;
         this.init();
         const t = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(120, t);
-        osc.frequency.exponentialRampToValueAtTime(800, t + 0.35);
+        osc.frequency.setValueAtTime(440, t);
+        osc.frequency.exponentialRampToValueAtTime(110, t + 0.08);
         gain.gain.setValueAtTime(0.35, t);
-        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.35);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
         osc.connect(gain);
         gain.connect(this.ctx.destination);
         osc.start(t);
-        osc.stop(t + 0.35);
+        osc.stop(t + 0.08);
+      }
+      playShot() {
+        if (this.muted) return;
+        this.init();
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(600, t);
+        osc.frequency.exponentialRampToValueAtTime(80, t + 0.09);
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.09);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.09);
+      }
+      playBoom() {
+        if (this.muted) return;
+        this.init();
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(140, t);
+        osc.frequency.exponentialRampToValueAtTime(30, t + 0.28);
+        gain.gain.setValueAtTime(0.5, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.28);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.28);
+      }
+      playMagic() {
+        if (this.muted) return;
+        this.init();
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, t);
+        osc.frequency.linearRampToValueAtTime(1040, t + 0.16);
+        gain.gain.setValueAtTime(0.25, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.16);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.16);
+      }
+      playCoin() {
+        if (this.muted) return;
+        this.init();
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(987.77, t);
+        osc.frequency.setValueAtTime(1318.51, t + 0.07);
+        gain.gain.setValueAtTime(0.2, t);
+        gain.gain.exponentialRampToValueAtTime(0.01, t + 0.18);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(t);
+        osc.stop(t + 0.18);
+      }
+      playGacha() {
+        if (this.muted) return;
+        this.init();
+        const t = this.ctx.currentTime;
+        [440, 554, 659, 880, 1108].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, t + idx * 0.06);
+          gain.gain.setValueAtTime(0.3, t + idx * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.01, t + idx * 0.06 + 0.2);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t + idx * 0.06);
+          osc.stop(t + idx * 0.06 + 0.2);
+        });
       }
       playWin() {
         if (this.muted) return;
@@ -497,52 +571,197 @@
     }
     const audio = new SoundFX();
 
+    // Fixed Logical World Coordinates for zero-desync across all device screens
+    const WORLD_WIDTH = 1200;
+    const WORLD_HEIGHT = 900;
+    const WORLD_CX = WORLD_WIDTH / 2;
+    const WORLD_CY = WORLD_HEIGHT / 2;
+    const OVUM_RADIUS = 64;
+    const BARRIER_RADIUS = 100;
+
     const MQTT_BROKER = 'wss://broker.hivemq.com:8884/mqtt';
-    const TOPIC_PREFIX = 'shikyuu-defenders/v3/';
+    const TOPIC_PREFIX = 'shikyuu-defenders/v4/';
     const SENDER_ID = 'p_' + Math.random().toString(36).substring(2, 9);
 
     const CANVAS = document.getElementById('gameCanvas');
     const CTX = CANVAS.getContext('2d');
 
-    // Differentiated Roles Specification
-    const ROLES = {
-      slipper: {
-        name: 'スリッパ強襲兵',
-        color: '#f43f5e',
-        icon: 'fa-shoe-prints',
-        speed: 310,
-        cooldown: 0.35,
-        radius: 85,
-        desc: '最速機動＆至近距離バチンスマッシュ'
-      },
-      acid: {
-        name: '強酸ケミカル兵',
-        color: '#10b981',
-        icon: 'fa-spray-can',
-        speed: 255,
-        cooldown: 1.2,
-        radius: 120,
-        desc: '広域持続毒霧（精子70%鈍足＆溶解）'
-      },
-      repair: {
-        name: '透明帯リペア工兵',
-        color: '#06b6d4',
-        icon: 'fa-cubes',
-        speed: 240,
-        cooldown: 7.0, // Re-balanced: extended cooldown to avoid abuse
-        radius: 75,
-        desc: '反発ゼリーバリケード設置＆透明帯+15%修復'
-      },
-      vacuum: {
-        name: 'ダイソン吸引バズーカ兵',
+    // Matrix Viewport transformation variables
+    let vpScale = 1;
+    let vpOffsetX = 0;
+    let vpOffsetY = 0;
+
+    function resizeCanvas() {
+      const parent = CANVAS.parentElement;
+      CANVAS.width = parent.clientWidth;
+      CANVAS.height = parent.clientHeight;
+      const sx = CANVAS.width / WORLD_WIDTH;
+      const sy = CANVAS.height / WORLD_HEIGHT;
+      vpScale = Math.min(sx, sy);
+      vpOffsetX = (CANVAS.width - WORLD_WIDTH * vpScale) / 2;
+      vpOffsetY = (CANVAS.height - WORLD_HEIGHT * vpScale) / 2;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function screenToWorld(sx, sy) {
+      return {
+        x: (sx - vpOffsetX) / vpScale,
+        y: (sy - vpOffsetY) / vpScale
+      };
+    }
+
+    const CHAR_CLASSES = {
+      brawler: {
+        id: 'brawler',
+        name: '素手兵',
+        icon: '👊',
         color: '#f59e0b',
-        icon: 'fa-tornado',
-        speed: 230,
-        cooldown: 2.5,
-        radius: 155,
-        desc: '重力ブラックホール射出＆密集群一網打尽'
+        cost: 0,
+        speed: 270,
+        atk: 1.2,
+        cd: 0.38,
+        range: 85,
+        type: 'melee',
+        desc: '最初から使える基本の素手防衛兵。素早いパンチを繰り出す。'
+      },
+      knife: {
+        id: 'knife',
+        name: 'ナイフ兵',
+        icon: '🔪',
+        color: '#ec4899',
+        cost: 100,
+        speed: 310,
+        atk: 0.9,
+        cd: 0.22,
+        range: 65,
+        type: 'melee',
+        desc: '超短いリーチだが最速の連撃とトップクラスの足の速さを誇る。'
+      },
+      spear: {
+        id: 'spear',
+        name: '槍兵',
+        icon: '🔱',
+        color: '#06b6d4',
+        cost: 150,
+        speed: 260,
+        atk: 1.8,
+        cd: 0.58,
+        range: 150,
+        type: 'spear',
+        desc: '前方に圧倒的な長さを誇る直線刺突攻撃。安全圏から串刺しにする。'
+      },
+      bomber: {
+        id: 'bomber',
+        name: '爆弾兵',
+        icon: '💣',
+        color: '#ef4444',
+        cost: 220,
+        speed: 245,
+        atk: 2.4,
+        cd: 1.15,
+        range: 260,
+        type: 'bomb',
+        desc: '少し長いクールダウンだが、着弾地点で広範囲の小爆発を起こす。'
+      },
+      pistol: {
+        id: 'pistol',
+        name: '拳銃兵',
+        icon: '🔫',
+        color: '#10b981',
+        cost: 280,
+        speed: 265,
+        atk: 1.0,
+        cd: 0.18, // Semi-auto cap
+        range: 420,
+        type: 'bullet',
+        desc: 'クリック連打で発射レートが跳ね上がるセミオートピストル兵。'
+      },
+      machinegun: {
+        id: 'machinegun',
+        name: '機銃兵',
+        icon: '⚙️',
+        color: '#f97316',
+        cost: 350,
+        speed: 240,
+        atk: 0.45,
+        cd: 0.12, // Auto-fire capable
+        range: 390,
+        type: 'bullet_auto',
+        desc: 'マウス長押しでフルオート掃射可能な機関銃兵。単発威力は控えめ。'
+      },
+      mage: {
+        id: 'mage',
+        name: '魔法兵',
+        icon: '🔮',
+        color: '#8b5cf6',
+        cost: 400,
+        speed: 255,
+        atk: 1.3,
+        cd: 0.72,
+        range: 430,
+        type: 'homing',
+        desc: '放った魔法弾が最も近くの精子に向かって緩やかに追尾・誘導する。'
+      },
+      unemployed: {
+        id: 'unemployed',
+        name: '無職',
+        icon: '💤',
+        color: '#64748b',
+        cost: 50,
+        speed: 280,
+        atk: 0.0,
+        cd: 0.8,
+        range: 0,
+        type: 'none',
+        desc: '本当に何も攻撃できない。戦場をただ走り回るだけの謎の存在。'
       }
     };
+
+    const BADGE_TYPES = [
+      { id: 'speed', name: '敏捷性', unit: '% 移動速度', maxVal: 12 },
+      { id: 'atk', name: '筋力', unit: '% 攻撃力', maxVal: 15 },
+      { id: 'range', name: '技術', unit: '% 攻撃範囲/弾速', maxVal: 16 },
+      { id: 'special_knockback', name: '衝撃波', unit: 'ノックバック強化', isSpecial: true },
+      { id: 'special_coin', name: '幸運', unit: '撃破コインUP', isSpecial: true },
+      { id: 'special_zona', name: '防衛本能', unit: '卵子付近で加速', isSpecial: true }
+    ];
+
+    function loadSavedData() {
+      let coins = parseInt(localStorage.getItem('sdf_coins') || '0', 10);
+      let unlocked = JSON.parse(localStorage.getItem('sdf_unlocked') || '["brawler"]');
+      let currentClass = localStorage.getItem('sdf_current_class') || 'brawler';
+      let badges = JSON.parse(localStorage.getItem('sdf_badges') || '{}');
+
+      // Initialize default badges if absent
+      Object.keys(CHAR_CLASSES).forEach(k => {
+        if (!badges[k]) {
+          badges[k] = [
+            { name: '新兵の靴', stat: 'speed', val: 3, rarity: 'common' },
+            { name: '新兵の腕力', stat: 'atk', val: 4, rarity: 'common' },
+            { name: '新兵の気合', stat: 'range', val: 4, rarity: 'common' }
+          ];
+        }
+      });
+
+      return { coins, unlocked, currentClass, badges };
+    }
+
+    const storage = loadSavedData();
+
+    function saveAllData() {
+      localStorage.setItem('sdf_coins', storage.coins);
+      localStorage.setItem('sdf_unlocked', JSON.stringify(storage.unlocked));
+      localStorage.setItem('sdf_current_class', storage.currentClass);
+      localStorage.setItem('sdf_badges', JSON.stringify(storage.badges));
+      updateCoinDisplays();
+    }
+
+    function updateCoinDisplays() {
+      document.getElementById('headerCoinCount').innerText = storage.coins;
+      document.getElementById('shopCoinDisplay').innerText = storage.coins;
+    }
+    updateCoinDisplays();
 
     const state = {
       isHost: false,
@@ -551,18 +770,24 @@
       roomCode: '',
       myId: SENDER_ID,
       myName: '隊員01',
-      myRole: 'slipper',
+      myClass: storage.currentClass,
       mqttClient: null,
 
-      // Players table
       players: {},
 
-      // Local authoritative player coords
-      localX: 0,
-      localY: 0,
-      lastSentX: 0,
-      lastSentY: 0,
+      // Logical World coordinates (Authoritative local)
+      localX: WORLD_CX,
+      localY: WORLD_CY + 140,
+      aimAngle: -Math.PI / 2,
+      lastSentX: WORLD_CX,
+      lastSentY: WORLD_CY + 140,
+      lastSentAngle: -Math.PI / 2,
       lastMoveSendTime: 0,
+
+      // Combat & Attack
+      isMouseDown: false,
+      lastAttackTime: 0,
+      mouseWorldPos: { x: WORLD_CX, y: WORLD_CY },
 
       // Session flags
       inLobby: false,
@@ -571,15 +796,13 @@
       timeLeft: 60,
       ovumHealth: 100,
       ovumMaxHealth: 100,
-      lastActionTime: 0,
+      sessionEarnedCoins: 0,
 
-      // Field entities
+      // World Entities
       sperms: [],
+      projectiles: [],
       particles: [],
-      effects: [],
-      acidPools: [],
-      barricades: [],
-      blackholes: [],
+      attackVisuals: [],
 
       // Simulation timers
       spawnTimer: 0,
@@ -591,18 +814,6 @@
       maleLion: null
     };
 
-    function resizeCanvas() {
-      const parent = CANVAS.parentElement;
-      CANVAS.width = parent.clientWidth;
-      CANVAS.height = parent.clientHeight;
-      if (state.localX === 0 && state.localY === 0) {
-        state.localX = CANVAS.width / 2;
-        state.localY = CANVAS.height / 2 + 130;
-      }
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
     function createFallbackLionCanvas(isMale = true) {
       const c = document.createElement('canvas');
       c.width = 160;
@@ -611,7 +822,6 @@
       const cx = 80, cy = 80;
 
       if (isMale) {
-        // Mane
         ctx.fillStyle = '#f97316';
         ctx.beginPath();
         for (let i = 0; i < 16; i++) {
@@ -628,14 +838,12 @@
         ctx.strokeStyle = '#000';
         ctx.stroke();
 
-        // Face
         ctx.fillStyle = '#fcd34d';
         ctx.beginPath();
         ctx.arc(cx, cy + 4, 42, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
 
-        // Ears
         ctx.fillStyle = '#f59e0b';
         ctx.beginPath();
         ctx.arc(cx - 30, cy - 30, 14, 0, Math.PI * 2);
@@ -643,7 +851,6 @@
         ctx.fill();
         ctx.stroke();
 
-        // Eyes & Snout
         ctx.fillStyle = '#000';
         ctx.beginPath();
         ctx.arc(cx - 15, cy - 2, 5, 0, Math.PI * 2);
@@ -658,7 +865,6 @@
         ctx.closePath();
         ctx.fill();
       } else {
-        // Female Lion
         ctx.fillStyle = '#fed7aa';
         ctx.beginPath();
         ctx.arc(cx, cy, 60, 0, Math.PI * 2);
@@ -667,7 +873,6 @@
         ctx.strokeStyle = '#000';
         ctx.stroke();
 
-        // Ears
         ctx.fillStyle = '#f97316';
         ctx.beginPath();
         ctx.arc(cx - 38, cy - 38, 18, 0, Math.PI * 2);
@@ -675,7 +880,6 @@
         ctx.fill();
         ctx.stroke();
 
-        // Eyes
         ctx.fillStyle = '#000';
         ctx.beginPath();
         ctx.arc(cx - 20, cy - 8, 8, 0, Math.PI * 2);
@@ -687,7 +891,6 @@
         ctx.arc(cx + 18, cy - 11, 3, 0, Math.PI * 2);
         ctx.fill();
 
-        // Cheeks
         ctx.fillStyle = '#f43f5e';
         ctx.globalAlpha = 0.55;
         ctx.beginPath();
@@ -696,7 +899,6 @@
         ctx.fill();
         ctx.globalAlpha = 1.0;
 
-        // Snout
         ctx.fillStyle = '#f43f5e';
         ctx.beginPath();
         ctx.arc(cx, cy + 8, 6, 0, Math.PI * 2);
@@ -833,12 +1035,11 @@
         client.subscribe(topic, { qos: 0 }, (err) => {
           if (!err) {
             registerLocalPlayer();
-            // Announce join
             publishMessage({
               type: 'PLAYER_JOIN',
               sender: SENDER_ID,
               name: state.myName,
-              role: state.myRole,
+              classId: state.myClass,
               isHostClaim: state.isHost
             });
           }
@@ -849,10 +1050,10 @@
       client.on('message', (topic, payload) => {
         try {
           const msg = JSON.parse(payload.toString());
-          if (msg.sender === SENDER_ID) return; // Discard own echo
+          if (msg.sender === SENDER_ID) return;
           handleIncomingMessage(msg);
         } catch (e) {
-          console.error('MQTT payload error', e);
+          console.error('MQTT packet parse err', e);
         }
       });
     }
@@ -864,16 +1065,18 @@
     }
 
     function registerLocalPlayer() {
-      state.localX = CANVAS.width / 2 + (Math.random() - 0.5) * 120;
-      state.localY = CANVAS.height / 2 + 130;
+      state.localX = WORLD_CX + (Math.random() - 0.5) * 160;
+      state.localY = WORLD_CY + 140;
       state.players[SENDER_ID] = {
         id: SENDER_ID,
         name: state.myName,
-        role: state.myRole,
+        classId: state.myClass,
         x: state.localX,
         y: state.localY,
+        angle: state.aimAngle,
         targetX: state.localX,
         targetY: state.localY,
+        targetAngle: state.aimAngle,
         isHost: state.isHost
       };
       updateLobbyRosterUI();
@@ -886,35 +1089,35 @@
             state.players[msg.sender] = {
               id: msg.sender,
               name: msg.name,
-              role: msg.role,
-              x: CANVAS.width / 2,
-              y: CANVAS.height / 2 + 130,
-              targetX: CANVAS.width / 2,
-              targetY: CANVAS.height / 2 + 130,
+              classId: msg.classId,
+              x: WORLD_CX,
+              y: WORLD_CY + 140,
+              angle: 0,
+              targetX: WORLD_CX,
+              targetY: WORLD_CY + 140,
+              targetAngle: 0,
               isHost: false
             };
           } else {
             state.players[msg.sender].name = msg.name;
-            state.players[msg.sender].role = msg.role;
+            state.players[msg.sender].classId = msg.classId;
           }
           updateLobbyRosterUI();
 
-          // Host replies with current authoritative state
           if (state.isHost) {
             publishMessage({
               type: 'HOST_LOBBY_SYNC',
               sender: SENDER_ID,
               hostId: SENDER_ID,
               gameRunning: state.gameRunning,
-              inCountdown: state.inCountdown,
               players: sanitizePlayersForSync()
             });
           }
           break;
 
-        case 'ROLE_CHANGE':
+        case 'CLASS_CHANGE':
           if (state.players[msg.sender]) {
-            state.players[msg.sender].role = msg.role;
+            state.players[msg.sender].classId = msg.classId;
             updateLobbyRosterUI();
           }
           break;
@@ -928,15 +1131,17 @@
                   state.players[id] = {
                     id: id,
                     name: msg.players[id].name,
-                    role: msg.players[id].role,
-                    x: msg.players[id].x || CANVAS.width / 2,
-                    y: msg.players[id].y || CANVAS.height / 2 + 130,
-                    targetX: msg.players[id].x || CANVAS.width / 2,
-                    targetY: msg.players[id].y || CANVAS.height / 2 + 130
+                    classId: msg.players[id].classId,
+                    x: msg.players[id].x || WORLD_CX,
+                    y: msg.players[id].y || WORLD_CY + 140,
+                    angle: msg.players[id].angle || 0,
+                    targetX: msg.players[id].x || WORLD_CX,
+                    targetY: msg.players[id].y || WORLD_CY + 140,
+                    targetAngle: msg.players[id].angle || 0
                   };
                 } else {
                   state.players[id].name = msg.players[id].name;
-                  state.players[id].role = msg.players[id].role;
+                  state.players[id].classId = msg.players[id].classId;
                 }
               }
             }
@@ -959,32 +1164,35 @@
           break;
 
         case 'PLAYER_MOVE':
-          // Smooth interpolation target
           if (state.players[msg.sender]) {
             state.players[msg.sender].targetX = msg.x;
             state.players[msg.sender].targetY = msg.y;
+            state.players[msg.sender].targetAngle = msg.angle;
           }
           break;
 
-        case 'PLAYER_ACTION':
-          triggerPlayerSkillVisual(msg.role, msg.x, msg.y);
+        case 'PLAYER_ATTACK_SIGNAL':
+          renderRemoteAttack(msg);
           if (state.isHost) {
-            applySkillToSimulation(msg.role, msg.x, msg.y);
+            applyAttackToSimulation(msg);
           }
+          break;
+
+        case 'COIN_DROP_SIGNAL':
+          storage.coins += msg.amount;
+          state.sessionEarnedCoins += msg.amount;
+          saveAllData();
+          audio.playCoin();
           break;
 
         case 'HOST_BATTLE_TICK':
           if (!state.isHost) {
-            // Fail-safe: if guest somehow missed start, jump straight into game
             if (!state.gameRunning && msg.status === 'RUNNING') {
               startBattleSession();
             }
             state.ovumHealth = msg.ovumHealth;
             state.timeLeft = msg.timeLeft;
             syncSpermsFromHost(msg.sperms);
-            state.acidPools = msg.acidPools || [];
-            state.barricades = msg.barricades || [];
-            state.blackholes = msg.blackholes || [];
 
             if (msg.status === 'WIN') showResult(true);
             if (msg.status === 'LOSE') showResult(false, msg.killerSperm);
@@ -998,9 +1206,10 @@
       for (let id in state.players) {
         res[id] = {
           name: state.players[id].name,
-          role: state.players[id].role,
+          classId: state.players[id].classId,
           x: Math.round(state.players[id].x),
-          y: Math.round(state.players[id].y)
+          y: Math.round(state.players[id].y),
+          angle: Math.round(state.players[id].angle * 100) / 100
         };
       }
       return res;
@@ -1021,7 +1230,6 @@
           existing.hp = h.hp;
           existing.type = h.type;
           existing.radius = h.r;
-          existing.slowed = h.sl;
           updated.push(existing);
         } else {
           updated.push({
@@ -1035,7 +1243,6 @@
             maxHp: h.mhp || h.hp,
             type: h.type,
             radius: h.r,
-            slowed: h.sl,
             tailLength: h.r * 3.4,
             wigglePhase: Math.random() * 6
           });
@@ -1065,6 +1272,7 @@
         state.gameRunning = false;
         state.inCountdown = false;
         updateLobbyRosterUI();
+        renderLobbyClassCards();
       } else if (viewName === 'COUNTDOWN') {
         document.getElementById('viewCountdown').classList.remove('hidden');
         state.inCountdown = true;
@@ -1074,6 +1282,7 @@
         state.inLobby = false;
         state.inCountdown = false;
         state.gameRunning = true;
+        document.getElementById('hudCurrentCharName').innerText = CHAR_CLASSES[state.myClass].name;
       }
     }
 
@@ -1087,7 +1296,6 @@
       const pKeys = Object.keys(state.players);
       countLabel.innerText = pKeys.length;
 
-      // Host election: Creator is host, or first alphabetically
       if (!state.hostId) {
         state.hostId = pKeys.sort()[0] || SENDER_ID;
       }
@@ -1108,40 +1316,71 @@
       memberList.innerHTML = '';
       pKeys.forEach(id => {
         const p = state.players[id];
-        const role = ROLES[p.role] || ROLES.slipper;
+        const cls = CHAR_CLASSES[p.classId] || CHAR_CLASSES.brawler;
         const isMe = (p.id === SENDER_ID);
         const isThisHost = (p.id === state.hostId);
 
         const card = document.createElement('div');
         card.className = `p-2 rounded-xl border flex items-center space-x-2 ${isMe ? 'border-yellow-400 bg-yellow-950/60' : 'border-slate-700 bg-slate-800'}`;
         card.innerHTML = `
-          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold" style="background-color:${role.color}">
-            <i class="fa-solid ${role.icon} text-white"></i>
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold bg-slate-700">
+            ${cls.icon}
           </div>
           <div class="flex-1 min-w-0">
             <div class="text-xs font-bold truncate ${isMe ? 'text-yellow-300' : 'text-white'}">
               ${p.name}${isMe ? ' (自機)' : ''}
             </div>
             <div class="text-[10px] text-gray-300 flex items-center space-x-1">
-              <span>${role.name.substring(0, 5)}</span>
+              <span class="font-bold" style="color:${cls.color}">${cls.name}</span>
               ${isThisHost ? '<span class="bg-amber-400 text-black px-1 rounded text-[9px] font-black">HOST</span>' : ''}
             </div>
           </div>
         `;
         memberList.appendChild(card);
       });
+    }
 
-      // Highlight selected role card
-      document.querySelectorAll('.role-btn').forEach(btn => {
-        if (btn.getAttribute('data-role') === state.myRole) {
-          btn.classList.add('role-selected');
-        } else {
-          btn.classList.remove('role-selected');
-        }
+    function renderLobbyClassCards() {
+      const container = document.getElementById('lobbyCharRoster');
+      container.innerHTML = '';
+      Object.keys(CHAR_CLASSES).forEach(key => {
+        const c = CHAR_CLASSES[key];
+        const isUnlocked = storage.unlocked.includes(key);
+        const isSelected = (state.myClass === key);
+
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `comic-box p-2 rounded-xl text-left transition flex items-center space-x-2 ${
+          isSelected ? 'char-card-selected' : (isUnlocked ? 'bg-slate-800 hover:bg-slate-700' : 'bg-slate-900/60 opacity-60 border-gray-700')
+        }`;
+        card.innerHTML = `
+          <div class="text-xl">${c.icon}</div>
+          <div class="flex-1 min-w-0">
+            <div class="text-xs font-black truncate text-white">${c.name}</div>
+            <div class="text-[10px] ${isUnlocked ? 'text-gray-400' : 'text-amber-400 font-bold'}">
+              ${isUnlocked ? (isSelected ? '★ 選択中' : '配備可能') : `🔒 ${c.cost}🪙`}
+            </div>
+          </div>
+        `;
+        card.addEventListener('click', () => {
+          if (isUnlocked) {
+            state.myClass = key;
+            storage.currentClass = key;
+            saveAllData();
+            if (state.players[SENDER_ID]) {
+              state.players[SENDER_ID].classId = key;
+            }
+            updateLobbyRosterUI();
+            renderLobbyClassCards();
+            publishMessage({ type: 'CLASS_CHANGE', sender: SENDER_ID, classId: key });
+          } else {
+            openShopModal(key);
+          }
+        });
+        container.appendChild(card);
       });
     }
 
-    // Title button: Create Room
     document.getElementById('btnCreateRoom').addEventListener('click', () => {
       audio.init();
       const name = document.getElementById('inputPlayerName').value.trim() || '指令長';
@@ -1152,7 +1391,6 @@
       initNetworkConnection(code);
     });
 
-    // Title button: Join Room
     document.getElementById('btnJoinRoom').addEventListener('click', () => {
       audio.init();
       const name = document.getElementById('inputPlayerName').value.trim() || '隊員01';
@@ -1166,7 +1404,6 @@
       initNetworkConnection(code);
     });
 
-    // Solo Practice
     document.getElementById('btnSoloPractice').addEventListener('click', () => {
       audio.init();
       state.myName = document.getElementById('inputPlayerName').value.trim() || '単独防衛兵';
@@ -1175,36 +1412,10 @@
       initNetworkConnection('SOLO' + Math.floor(10 + Math.random() * 90), true);
     });
 
-    // Role switcher in lobby
-    document.querySelectorAll('.role-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const newRole = btn.getAttribute('data-role');
-        state.myRole = newRole;
-        if (state.players[SENDER_ID]) {
-          state.players[SENDER_ID].role = newRole;
-        }
-        updateLobbyRosterUI();
-        updateActionSkillButtonUI();
-
-        publishMessage({
-          type: 'ROLE_CHANGE',
-          sender: SENDER_ID,
-          role: newRole
-        });
-      });
-    });
-
-    function updateActionSkillButtonUI() {
-      const role = ROLES[state.myRole];
-      document.getElementById('skillIcon').className = `fa-solid ${role.icon} text-2xl md:text-3xl mb-0.5`;
-      document.getElementById('skillName').innerText = role.name;
-    }
-
-    // Host starts countdown
+    // Start Button (Clean '作戦開始' label)
     document.getElementById('btnHostStartCountdown').addEventListener('click', () => {
       if (state.isHost) {
         audio.init();
-        // Broadcast countdown signal to all participants
         publishMessage({ type: 'START_COUNTDOWN_SIGNAL', sender: SENDER_ID });
         runCountdownSequence();
       }
@@ -1213,7 +1424,6 @@
     function runCountdownSequence() {
       switchView('COUNTDOWN');
       const numEl = document.getElementById('countdownNumber');
-
       let current = 3;
       numEl.innerText = current;
       audio.playTick();
@@ -1241,26 +1451,23 @@
       state.gameRunning = true;
       state.timeLeft = 60;
       state.ovumHealth = 100;
+      state.sessionEarnedCoins = 0;
       state.sperms = [];
+      state.projectiles = [];
       state.particles = [];
-      state.effects = [];
-      state.acidPools = [];
-      state.barricades = [];
-      state.blackholes = [];
+      state.attackVisuals = [];
 
-      const cx = CANVAS.width / 2;
-      const cy = CANVAS.height / 2;
-      state.localX = cx + (Math.random() - 0.5) * 120;
-      state.localY = cy + 130;
+      state.localX = WORLD_CX + (Math.random() - 0.5) * 160;
+      state.localY = WORLD_CY + 140;
+      state.aimAngle = -Math.PI / 2;
 
       if (state.players[SENDER_ID]) {
         state.players[SENDER_ID].x = state.localX;
         state.players[SENDER_ID].y = state.localY;
+        state.players[SENDER_ID].angle = state.aimAngle;
       }
-      updateActionSkillButtonUI();
     }
 
-    // Return to lobby button from result
     document.getElementById('btnReturnToLobby').addEventListener('click', () => {
       if (state.isHost) {
         publishMessage({ type: 'RETURN_TO_LOBBY_SIGNAL', sender: SENDER_ID });
@@ -1268,7 +1475,6 @@
       switchView('LOBBY');
     });
 
-    // Leave room
     document.getElementById('btnLeaveRoom').addEventListener('click', () => {
       if (state.mqttClient) {
         try { state.mqttClient.end(); } catch (e) {}
@@ -1277,7 +1483,6 @@
       switchView('TITLE');
     });
 
-    // Copy badges and URLs
     function copyText(txt, msg) {
       if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(txt).then(() => showFloatingToast(msg));
@@ -1296,10 +1501,9 @@
     document.getElementById('btnCopyLobbyRoom').addEventListener('click', () => copyText(state.roomCode, 'ルームコードをコピーしました！'));
     document.getElementById('btnShareInvite').addEventListener('click', () => {
       const url = `${window.location.origin}${window.location.pathname}#${state.roomCode}`;
-      copyText(url, '招待URLをコピーしました！友達に送信しよう！');
+      copyText(url, '招待URLをコピーしました！');
     });
 
-    // Auto load hash room
     if (window.location.hash) {
       const hashRoom = window.location.hash.substring(1).trim().toUpperCase();
       if (hashRoom) {
@@ -1307,7 +1511,6 @@
       }
     }
 
-    // Settings modals
     document.getElementById('btnToggleSettings').addEventListener('click', () => document.getElementById('settingsModal').classList.remove('hidden'));
     document.getElementById('btnCloseSettings').addEventListener('click', () => document.getElementById('settingsModal').classList.add('hidden'));
     document.getElementById('btnSavePhotos').addEventListener('click', () => {
@@ -1315,7 +1518,6 @@
       showFloatingToast('写真設定を保存しました');
     });
 
-    // Audio toggle
     document.getElementById('btnSoundToggle').addEventListener('click', () => {
       audio.muted = !audio.muted;
       const icon = document.getElementById('soundIcon');
@@ -1329,32 +1531,442 @@
       }
     });
 
+    let selectedShopCharKey = 'brawler';
+
+    function openShopModal(targetCharKey = null) {
+      if (targetCharKey) selectedShopCharKey = targetCharKey;
+      document.getElementById('shopModal').classList.remove('hidden');
+      renderShopCharList();
+      renderShopCharDetail();
+    }
+
+    document.getElementById('btnOpenShop').addEventListener('click', () => openShopModal());
+    document.getElementById('btnLobbyOpenShop').addEventListener('click', () => openShopModal());
+    document.getElementById('btnCloseShop').addEventListener('click', () => document.getElementById('shopModal').classList.add('hidden'));
+
+    function renderShopCharList() {
+      const container = document.getElementById('shopCharList');
+      container.innerHTML = '';
+
+      Object.keys(CHAR_CLASSES).forEach(key => {
+        const c = CHAR_CLASSES[key];
+        const isUnlocked = storage.unlocked.includes(key);
+        const isCurrentActive = (state.myClass === key);
+        const isFocused = (selectedShopCharKey === key);
+
+        const row = document.createElement('div');
+        row.className = `p-2.5 rounded-xl border flex items-center justify-between cursor-pointer transition ${
+          isFocused ? 'border-amber-400 bg-amber-950/40' : 'border-slate-700 bg-slate-800/80 hover:bg-slate-700/80'
+        }`;
+        row.innerHTML = `
+          <div class="flex items-center space-x-2.5">
+            <span class="text-2xl">${c.icon}</span>
+            <div>
+              <div class="text-xs font-black flex items-center space-x-1.5">
+                <span class="${isCurrentActive ? 'text-yellow-300' : 'text-white'}">${c.name}</span>
+                ${isCurrentActive ? '<span class="bg-yellow-400 text-black px-1.5 py-0.2 rounded text-[9px] font-black">出撃中</span>' : ''}
+              </div>
+              <div class="text-[10px] text-gray-400">速度: ${c.speed} | 威力: ${c.atk}</div>
+            </div>
+          </div>
+          <div>
+            ${isUnlocked 
+              ? '<span class="text-[11px] text-emerald-400 font-black"><i class="fa-solid fa-check"></i> 解放済</span>' 
+              : `<span class="bg-amber-500 text-black px-2 py-1 rounded-lg text-xs font-black">${c.cost} 🪙</span>`}
+          </div>
+        `;
+        row.addEventListener('click', () => {
+          selectedShopCharKey = key;
+          renderShopCharList();
+          renderShopCharDetail();
+        });
+        container.appendChild(row);
+      });
+    }
+
+    function renderShopCharDetail() {
+      const c = CHAR_CLASSES[selectedShopCharKey];
+      const isUnlocked = storage.unlocked.includes(selectedShopCharKey);
+      const isCurrentActive = (state.myClass === selectedShopCharKey);
+
+      document.getElementById('detailCharIcon').innerText = c.icon;
+      document.getElementById('detailCharName').innerText = c.name;
+      document.getElementById('detailCharRole').innerText = `攻撃タイプ: ${c.type.toUpperCase()}`;
+      document.getElementById('detailCharDesc').innerText = c.desc;
+
+      // Render 3 Badges
+      const badgeContainer = document.getElementById('detailBadgeSlots');
+      badgeContainer.innerHTML = '';
+      const charBadges = storage.badges[selectedShopCharKey] || [];
+
+      for (let i = 0; i < 3; i++) {
+        const b = charBadges[i];
+        const card = document.createElement('div');
+        if (b) {
+          card.className = `p-1.5 rounded-lg border bg-slate-900 text-center rarity-${b.rarity}`;
+          card.innerHTML = `
+            <div class="text-[9px] uppercase font-black tracking-wider opacity-70">${b.rarity}</div>
+            <div class="text-[11px] font-black truncate">${b.name}</div>
+            <div class="text-[10px] text-yellow-300 font-bold">+${b.val}${b.unit || '%'}</div>
+          `;
+        } else {
+          card.className = 'p-1.5 rounded-lg border border-dashed border-slate-600 text-center text-gray-500 text-[10px] flex items-center justify-center';
+          card.innerText = '空スロット';
+        }
+        badgeContainer.appendChild(card);
+      }
+
+      // Equip or Unlock Button
+      const actBtn = document.getElementById('btnEquipOrUnlockChar');
+      if (!isUnlocked) {
+        actBtn.className = 'comic-btn w-full bg-amber-400 hover:bg-amber-300 text-black font-black text-xs py-2.5 rounded-xl';
+        actBtn.innerHTML = `<i class="fa-solid fa-lock-open mr-1"></i> ${c.cost}コインで解放する`;
+        actBtn.onclick = () => {
+          if (storage.coins >= c.cost) {
+            storage.coins -= c.cost;
+            storage.unlocked.push(selectedShopCharKey);
+            saveAllData();
+            audio.playGacha();
+            showFloatingToast(`『${c.name}』を配備可能にしました！`);
+            renderShopCharList();
+            renderShopCharDetail();
+            renderLobbyClassCards();
+          } else {
+            showFloatingToast('コインが足りません！戦って精子を倒そう！');
+          }
+        };
+      } else {
+        if (isCurrentActive) {
+          actBtn.className = 'comic-btn w-full bg-slate-700 text-gray-400 font-black text-xs py-2.5 rounded-xl cursor-default';
+          actBtn.innerText = '現在出撃兵種に選択中';
+          actBtn.onclick = null;
+        } else {
+          actBtn.className = 'comic-btn w-full bg-yellow-400 hover:bg-yellow-300 text-black font-black text-xs py-2.5 rounded-xl';
+          actBtn.innerText = 'この兵種で出撃する';
+          actBtn.onclick = () => {
+            state.myClass = selectedShopCharKey;
+            storage.currentClass = selectedShopCharKey;
+            saveAllData();
+            if (state.players[SENDER_ID]) {
+              state.players[SENDER_ID].classId = selectedShopCharKey;
+            }
+            showFloatingToast(`出撃兵種を『${c.name}』に変更！`);
+            updateLobbyRosterUI();
+            renderShopCharList();
+            renderShopCharDetail();
+            renderLobbyClassCards();
+            publishMessage({ type: 'CLASS_CHANGE', sender: SENDER_ID, classId: selectedShopCharKey });
+          };
+        }
+      }
+    }
+
+    // Badge Gacha (Rolls 3 random badges for current inspected character)
+    document.getElementById('btnGachaBadges').addEventListener('click', () => {
+      const GACHA_COST = 50;
+      if (storage.coins < GACHA_COST) {
+        showFloatingToast('ガチャに必要なコイン(50🪙)が足りません！');
+        return;
+      }
+
+      storage.coins -= GACHA_COST;
+      audio.playGacha();
+
+      const newBadges = [];
+      for (let i = 0; i < 3; i++) {
+        const rand = Math.random();
+        let rarity = 'common';
+        let valMultiplier = 1;
+
+        if (rand > 0.93) {
+          rarity = 'sr';
+          valMultiplier = 2.4;
+        } else if (rand > 0.68) {
+          rarity = 'rare';
+          valMultiplier = 1.6;
+        }
+
+        const bType = BADGE_TYPES[Math.floor(Math.random() * BADGE_TYPES.length)];
+        let val = bType.isSpecial ? 1 : Math.round((3 + Math.random() * 5) * valMultiplier);
+
+        newBadges.push({
+          name: `${rarity === 'sr' ? '極・' : (rarity === 'rare' ? '上級・' : '')}${bType.name}`,
+          stat: bType.id,
+          val: val,
+          unit: bType.isSpecial ? 'Lv' : '%',
+          rarity: rarity
+        });
+      }
+
+      storage.badges[selectedShopCharKey] = newBadges;
+      saveAllData();
+      renderShopCharDetail();
+      showFloatingToast('バッジ3枠を一括再抽選しました！');
+    });
+
+    function getPlayerStats(classId) {
+      const base = CHAR_CLASSES[classId] || CHAR_CLASSES.brawler;
+      const badges = storage.badges[classId] || [];
+
+      let spdBonus = 0;
+      let atkBonus = 0;
+      let rangeBonus = 0;
+      let hasKnockback = false;
+      let hasCoinBonus = false;
+      let hasZonaBoost = false;
+
+      badges.forEach(b => {
+        if (b.stat === 'speed') spdBonus += b.val;
+        if (b.stat === 'atk') atkBonus += b.val;
+        if (b.stat === 'range') rangeBonus += b.val;
+        if (b.stat === 'special_knockback') hasKnockback = true;
+        if (b.stat === 'special_coin') hasCoinBonus = true;
+        if (b.stat === 'special_zona') hasZonaBoost = true;
+      });
+
+      return {
+        speed: base.speed * (1 + spdBonus / 100),
+        atk: base.atk * (1 + atkBonus / 100),
+        cd: Math.max(0.08, base.cd * (1 - (rangeBonus * 0.3) / 100)),
+        range: base.range * (1 + rangeBonus / 100),
+        type: base.type,
+        hasKnockback,
+        hasCoinBonus,
+        hasZonaBoost
+      };
+    }
+
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+      keys[e.key.toLowerCase()] = true;
+    });
+    window.addEventListener('keyup', (e) => {
+      keys[e.key.toLowerCase()] = false;
+    });
+
+    CANVAS.addEventListener('pointerdown', (e) => {
+      state.isMouseDown = true;
+      const rect = CANVAS.getBoundingClientRect();
+      state.mouseWorldPos = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      handleAttackTrigger();
+    });
+
+    CANVAS.addEventListener('pointermove', (e) => {
+      const rect = CANVAS.getBoundingClientRect();
+      state.mouseWorldPos = screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
+      state.aimAngle = Math.atan2(state.mouseWorldPos.y - state.localY, state.mouseWorldPos.x - state.localX);
+    });
+
+    window.addEventListener('pointerup', () => {
+      state.isMouseDown = false;
+    });
+
+    function handleAttackTrigger() {
+      if (!state.gameRunning) return;
+      const stats = getPlayerStats(state.myClass);
+      if (stats.type === 'none') return; // Unemployed cannot attack
+
+      const now = performance.now() / 1000;
+      if (now - state.lastAttackTime < stats.cd) return;
+      state.lastAttackTime = now;
+
+      // Local Audio & Visual Trigger
+      triggerLocalAttackAction(stats);
+    }
+
+    function triggerLocalAttackAction(stats) {
+      const myId = SENDER_ID;
+      const originX = state.localX;
+      const originY = state.localY;
+      const angle = state.aimAngle;
+
+      const attackPayload = {
+        type: 'PLAYER_ATTACK_SIGNAL',
+        sender: myId,
+        classId: state.myClass,
+        x: Math.round(originX),
+        y: Math.round(originY),
+        angle: Math.round(angle * 1000) / 1000,
+        stats: {
+          atk: stats.atk,
+          range: stats.range,
+          type: stats.type,
+          hasKnockback: stats.hasKnockback
+        }
+      };
+
+      // Sound
+      if (stats.type === 'melee') audio.playPunch();
+      else if (stats.type === 'spear') audio.playStab();
+      else if (stats.type === 'bullet' || stats.type === 'bullet_auto') audio.playShot();
+      else if (stats.type === 'bomb') audio.playBoom();
+      else if (stats.type === 'homing') audio.playMagic();
+
+      renderRemoteAttack(attackPayload);
+      publishMessage(attackPayload);
+
+      if (state.isHost) {
+        applyAttackToSimulation(attackPayload);
+      }
+    }
+
+    function renderRemoteAttack(data) {
+      const { x, y, angle, stats, classId } = data;
+
+      if (stats.type === 'melee') {
+        state.attackVisuals.push({
+          type: 'slash',
+          x, y, angle,
+          radius: stats.range,
+          life: 0.18, maxLife: 0.18,
+          color: CHAR_CLASSES[classId].color
+        });
+      } else if (stats.type === 'spear') {
+        state.attackVisuals.push({
+          type: 'spear_thrust',
+          x, y, angle,
+          length: stats.range,
+          life: 0.22, maxLife: 0.22,
+          color: CHAR_CLASSES[classId].color
+        });
+      } else if (stats.type === 'bullet' || stats.type === 'bullet_auto') {
+        state.projectiles.push({
+          id: 'proj_' + Math.random().toString(36).substring(2, 7),
+          owner: data.sender,
+          x: x + Math.cos(angle) * 22,
+          y: y + Math.sin(angle) * 22,
+          vx: Math.cos(angle) * 580,
+          vy: Math.sin(angle) * 580,
+          radius: 5,
+          rangeLeft: stats.range,
+          damage: stats.atk,
+          color: CHAR_CLASSES[classId].color,
+          hasKnockback: stats.hasKnockback,
+          isHoming: false
+        });
+      } else if (stats.type === 'bomb') {
+        state.projectiles.push({
+          id: 'bomb_' + Math.random().toString(36).substring(2, 7),
+          owner: data.sender,
+          x: x + Math.cos(angle) * 20,
+          y: y + Math.sin(angle) * 20,
+          vx: Math.cos(angle) * 320,
+          vy: Math.sin(angle) * 320,
+          radius: 8,
+          rangeLeft: stats.range,
+          damage: stats.atk,
+          isBomb: true,
+          color: '#ef4444'
+        });
+      } else if (stats.type === 'homing') {
+        state.projectiles.push({
+          id: 'mage_' + Math.random().toString(36).substring(2, 7),
+          owner: data.sender,
+          x: x + Math.cos(angle) * 22,
+          y: y + Math.sin(angle) * 22,
+          vx: Math.cos(angle) * 340,
+          vy: Math.sin(angle) * 340,
+          radius: 7,
+          rangeLeft: stats.range,
+          damage: stats.atk,
+          isHoming: true,
+          color: '#a855f7'
+        });
+      }
+    }
+
+    function applyAttackToSimulation(data) {
+      const { x, y, angle, stats } = data;
+
+      if (stats.type === 'melee') {
+        for (let i = state.sperms.length - 1; i >= 0; i--) {
+          const sp = state.sperms[i];
+          const dist = Math.hypot(sp.x - x, sp.y - y);
+          if (dist <= stats.range + sp.radius) {
+            const hitAngle = Math.atan2(sp.y - y, sp.x - x);
+            const angleDiff = Math.abs(normalizeAngle(hitAngle - angle));
+            if (angleDiff <= Math.PI * 0.45) {
+              damageSperm(sp, stats.atk, angle, stats.hasKnockback ? 85 : 45);
+            }
+          }
+        }
+      } else if (stats.type === 'spear') {
+        for (let i = state.sperms.length - 1; i >= 0; i--) {
+          const sp = state.sperms[i];
+          // Line segment projection for spear thrust
+          const spearTipX = x + Math.cos(angle) * stats.range;
+          const spearTipY = y + Math.sin(angle) * stats.range;
+          const distToLine = distancePointToSegment(sp.x, sp.y, x, y, spearTipX, spearTipY);
+          if (distToLine <= sp.radius + 18) {
+            damageSperm(sp, stats.atk, angle, 65);
+          }
+        }
+      }
+    }
+
+    function distancePointToSegment(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const l2 = dx * dx + dy * dy;
+      if (l2 === 0) return Math.hypot(px - x1, py - y1);
+      let t = ((px - x1) * dx + (py - y1) * dy) / l2;
+      t = Math.max(0, Math.min(1, t));
+      return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    }
+
+    function normalizeAngle(ang) {
+      while (ang > Math.PI) ang -= Math.PI * 2;
+      while (ang < -Math.PI) ang += Math.PI * 2;
+      return ang;
+    }
+
+    function damageSperm(sp, dmg, pushAngle, pushForce = 35) {
+      sp.hp -= dmg;
+      createExplosion(sp.x, sp.y, '#f59e0b', 5);
+      sp.x += Math.cos(pushAngle) * pushForce;
+      sp.y += Math.sin(pushAngle) * pushForce;
+
+      if (sp.hp <= 0) {
+        // Drop coin event
+        const coinAmount = (sp.type === 'tank' ? 3 : (sp.type === 'speedy' ? 2 : 1));
+        storage.coins += coinAmount;
+        state.sessionEarnedCoins += coinAmount;
+        saveAllData();
+        audio.playCoin();
+
+        publishMessage({
+          type: 'COIN_DROP_SIGNAL',
+          sender: SENDER_ID,
+          amount: coinAmount
+        });
+      }
+    }
+
     function spawnSperm() {
-      const cx = CANVAS.width / 2;
-      const cy = CANVAS.height / 2;
-      const spawnRadius = Math.max(CANVAS.width, CANVAS.height) * 0.62;
+      const spawnRadius = Math.max(WORLD_WIDTH, WORLD_HEIGHT) * 0.65;
       const angle = Math.random() * Math.PI * 2;
 
-      const startX = cx + Math.cos(angle) * spawnRadius;
-      const startY = cy + Math.sin(angle) * spawnRadius;
+      const startX = WORLD_CX + Math.cos(angle) * spawnRadius;
+      const startY = WORLD_CY + Math.sin(angle) * spawnRadius;
 
       const playerCount = Math.max(1, Object.keys(state.players).length);
-      const speedScale = 1.0 + (60 - state.timeLeft) * 0.012;
-      const baseSpeed = (1.45 + Math.random() * 0.8) * speedScale;
+      const speedScale = 1.0 + (60 - state.timeLeft) * 0.01;
+      const baseSpeed = (1.5 + Math.random() * 0.7) * speedScale;
 
       const types = ['normal', 'normal', 'speedy', 'tank'];
       const type = types[Math.floor(Math.random() * types.length)];
 
-      let hp = 1;
-      let radius = 18;
+      let hp = 1.5;
+      let radius = 20;
       let spd = baseSpeed;
 
       if (type === 'speedy') {
         spd *= 1.45;
-        radius = 15;
+        radius = 16;
+        hp = 1.0;
       } else if (type === 'tank') {
-        hp = 2 + Math.floor(playerCount * 0.35);
-        radius = 26;
+        hp = 3.5 + Math.floor(playerCount * 0.4);
+        radius = 28;
         spd *= 0.72;
       }
 
@@ -1370,90 +1982,42 @@
         radius: radius,
         type: type,
         wigglePhase: Math.random() * Math.PI * 2,
-        tailLength: radius * 3.4,
-        slowTimer: 0
+        tailLength: radius * 3.4
       });
     }
 
     function updateSperms(dt) {
-      const cx = CANVAS.width / 2;
-      const cy = CANVAS.height / 2;
-      const ovumRadius = 60;
-      const barrierRadius = 92;
-
       for (let i = state.sperms.length - 1; i >= 0; i--) {
         const sp = state.sperms[i];
-
-        // Chemical acid pools slowdown & damage
-        let isInAcid = false;
-        state.acidPools.forEach(pool => {
-          if (Math.hypot(sp.x - pool.x, sp.y - pool.y) <= pool.radius + sp.radius) {
-            isInAcid = true;
-            pool.tickDmgTimer = (pool.tickDmgTimer || 0) + dt;
-            if (pool.tickDmgTimer >= 0.5) {
-              sp.hp -= 0.6;
-              createExplosion(sp.x, sp.y, '#10b981', 3);
-            }
-          }
-        });
-
-        // Blackhole gravity suction
-        state.blackholes.forEach(bh => {
-          const bDist = Math.hypot(bh.x - sp.x, bh.y - sp.y);
-          if (bDist <= bh.radius) {
-            const pullAngle = Math.atan2(bh.y - sp.y, bh.x - sp.x);
-            const pullForce = 180 * (1 - bDist / bh.radius) * dt;
-            sp.x += Math.cos(pullAngle) * pullForce;
-            sp.y += Math.sin(pullAngle) * pullForce;
-          }
-        });
-
-        // Barricade bouncy collision
-        state.barricades.forEach(bar => {
-          const bDist = Math.hypot(sp.x - bar.x, sp.y - bar.y);
-          if (bDist <= bar.radius + sp.radius) {
-            const bounceAng = Math.atan2(sp.y - bar.y, sp.x - bar.x);
-            sp.x += Math.cos(bounceAng) * 45;
-            sp.y += Math.sin(bounceAng) * 45;
-            createExplosion(sp.x, sp.y, '#06b6d4', 4);
-          }
-        });
 
         if (sp.hp <= 0) {
           state.sperms.splice(i, 1);
           continue;
         }
 
-        if (isInAcid || sp.slowTimer > 0) {
-          sp.speed = sp.baseSpeed * 0.3; // 70% slow
-          if (sp.slowTimer > 0) sp.slowTimer -= dt;
-        } else {
-          sp.speed = sp.baseSpeed;
-        }
-
-        const dx = cx - sp.x;
-        const dy = cy - sp.y;
+        const dx = WORLD_CX - sp.x;
+        const dy = WORLD_CY - sp.y;
         const dist = Math.hypot(dx, dy);
         sp.angle = Math.atan2(dy, dx);
 
         sp.x += Math.cos(sp.angle) * sp.speed;
         sp.y += Math.sin(sp.angle) * sp.speed;
-        sp.wigglePhase += 0.28 * (sp.speed / sp.baseSpeed);
+        sp.wigglePhase += 0.28;
 
-        // Barrier collision
-        if (dist <= barrierRadius + sp.radius) {
+        // Collision with Zona Pellucida Barrier
+        if (dist <= BARRIER_RADIUS + sp.radius) {
           if (state.ovumHealth > 0) {
-            const dmg = (sp.type === 'tank' ? 7 : 4);
+            const dmg = (sp.type === 'tank' ? 6 : 3.5);
             state.ovumHealth = Math.max(0, state.ovumHealth - dmg);
             createExplosion(sp.x, sp.y, '#38bdf8', 8);
             sp.x -= Math.cos(sp.angle) * 35;
             sp.y -= Math.sin(sp.angle) * 35;
-            sp.hp -= 1;
+            sp.hp -= 1.0;
             if (sp.hp <= 0) {
               state.sperms.splice(i, 1);
               continue;
             }
-          } else if (dist <= ovumRadius) {
+          } else if (dist <= OVUM_RADIUS) {
             triggerGameOver(sp);
             return;
           }
@@ -1461,92 +2025,74 @@
       }
     }
 
-    function triggerLocalPlayerAction() {
-      const now = performance.now() / 1000;
-      const role = ROLES[state.myRole];
-      if (now - state.lastActionTime < role.cooldown) return;
-      state.lastActionTime = now;
+    function updateProjectiles(dt) {
+      for (let i = state.projectiles.length - 1; i >= 0; i--) {
+        const p = state.projectiles[i];
 
-      // Local audio feedback
-      if (state.myRole === 'slipper') audio.playSmash();
-      else if (state.myRole === 'acid') audio.playAcid();
-      else if (state.myRole === 'repair') audio.playBarricade();
-      else if (state.myRole === 'vacuum') audio.playBlackhole();
-
-      // Broadcast action packet
-      publishMessage({
-        type: 'PLAYER_ACTION',
-        sender: SENDER_ID,
-        role: state.myRole,
-        x: Math.round(state.localX),
-        y: Math.round(state.localY)
-      });
-
-      triggerPlayerSkillVisual(state.myRole, state.localX, state.localY);
-
-      if (state.isHost) {
-        applySkillToSimulation(state.myRole, state.localX, state.localY);
-      }
-    }
-
-    function applySkillToSimulation(roleKey, x, y) {
-      if (roleKey === 'slipper') {
-        // High impact single/area smash
-        const r = ROLES.slipper.radius;
-        for (let i = state.sperms.length - 1; i >= 0; i--) {
-          const sp = state.sperms[i];
-          const dist = Math.hypot(sp.x - x, sp.y - y);
-          if (dist <= r + sp.radius) {
-            sp.hp -= 3;
-            createExplosion(sp.x, sp.y, '#f43f5e', 14);
-            const pushAngle = Math.atan2(sp.y - y, sp.x - x);
-            sp.x += Math.cos(pushAngle) * 110;
-            sp.y += Math.sin(pushAngle) * 110;
-            if (sp.hp <= 0) state.sperms.splice(i, 1);
+        if (p.isHoming && state.sperms.length > 0) {
+          // Find nearest sperm
+          let nearest = null;
+          let minDist = 400;
+          state.sperms.forEach(s => {
+            const d = Math.hypot(s.x - p.x, s.y - p.y);
+            if (d < minDist) {
+              minDist = d;
+              nearest = s;
+            }
+          });
+          if (nearest) {
+            const targetAng = Math.atan2(nearest.y - p.y, nearest.x - p.x);
+            p.vx += Math.cos(targetAng) * 750 * dt;
+            p.vy += Math.sin(targetAng) * 750 * dt;
+            const curSpd = Math.hypot(p.vx, p.vy);
+            p.vx = (p.vx / curSpd) * 380;
+            p.vy = (p.vy / curSpd) * 380;
           }
         }
-      } else if (roleKey === 'acid') {
-        // Drop persistent acid puddle
-        state.acidPools.push({
-          x: x,
-          y: y,
-          radius: ROLES.acid.radius,
-          life: 4.5,
-          maxLife: 4.5
-        });
-      } else if (roleKey === 'repair') {
-        // Re-balanced: +15% shield only, plus barricade block
-        state.ovumHealth = Math.min(state.ovumMaxHealth, state.ovumHealth + 15);
-        state.barricades.push({
-          x: x,
-          y: y,
-          radius: ROLES.repair.radius,
-          life: 6.0,
-          maxLife: 6.0
-        });
-      } else if (roleKey === 'vacuum') {
-        // Spawn Blackhole gravity vortex ahead
-        state.blackholes.push({
-          x: x,
-          y: y,
-          radius: ROLES.vacuum.radius,
-          life: 2.8,
-          maxLife: 2.8
-        });
-      }
-    }
 
-    function triggerPlayerSkillVisual(roleKey, x, y) {
-      const role = ROLES[roleKey];
-      state.effects.push({
-        role: roleKey,
-        x: x,
-        y: y,
-        radius: role.radius,
-        alpha: 1.0,
-        color: role.color,
-        angle: Math.random() * Math.PI * 2
-      });
+        const moveStep = Math.hypot(p.vx * dt, p.vy * dt);
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+        p.rangeLeft -= moveStep;
+
+        // Check collision with sperms (Authoritative only on Host)
+        let hit = false;
+        if (state.isHost) {
+          for (let j = state.sperms.length - 1; j >= 0; j--) {
+            const sp = state.sperms[j];
+            const hitDist = Math.hypot(sp.x - p.x, sp.y - p.y);
+            if (hitDist <= sp.radius + p.radius) {
+              hit = true;
+              if (p.isBomb) {
+                // Splash AoE damage
+                const bombRadius = 80;
+                createExplosion(p.x, p.y, '#ef4444', 16);
+                state.sperms.forEach(targetSp => {
+                  const splashDist = Math.hypot(targetSp.x - p.x, targetSp.y - p.y);
+                  if (splashDist <= bombRadius + targetSp.radius) {
+                    damageSperm(targetSp, p.damage, Math.atan2(targetSp.y - p.y, targetSp.x - p.x), 70);
+                  }
+                });
+              } else {
+                damageSperm(sp, p.damage, Math.atan2(p.vy, p.vx), p.hasKnockback ? 80 : 35);
+              }
+              break;
+            }
+          }
+        }
+
+        if (hit || p.rangeLeft <= 0) {
+          if (p.isBomb && !hit) createExplosion(p.x, p.y, '#ef4444', 12);
+          state.projectiles.splice(i, 1);
+        }
+      }
+
+      // Attack visual lifetimes
+      for (let i = state.attackVisuals.length - 1; i >= 0; i--) {
+        const v = state.attackVisuals[i];
+        v.life -= dt;
+        if (v.life <= 0) state.attackVisuals.splice(i, 1);
+      }
     }
 
     function createExplosion(x, y, color, count = 8) {
@@ -1565,38 +2111,8 @@
       }
     }
 
-    const keys = {};
-    window.addEventListener('keydown', (e) => {
-      keys[e.key.toLowerCase()] = true;
-      if (e.code === 'Space') {
-        e.preventDefault();
-        triggerLocalPlayerAction();
-      }
-    });
-    window.addEventListener('keyup', (e) => {
-      keys[e.key.toLowerCase()] = false;
-    });
-
-    let pointerTarget = null;
-    CANVAS.addEventListener('pointerdown', (e) => {
-      const rect = CANVAS.getBoundingClientRect();
-      pointerTarget = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-      triggerLocalPlayerAction();
-    });
-    CANVAS.addEventListener('pointermove', (e) => {
-      if (e.buttons > 0) {
-        const rect = CANVAS.getBoundingClientRect();
-        pointerTarget = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-      }
-    });
-    window.addEventListener('pointerup', () => { pointerTarget = null; });
-    document.getElementById('btnActionSkill').addEventListener('click', (e) => {
-      e.stopPropagation();
-      triggerLocalPlayerAction();
-    });
-
     function updateLocalPlayerMovement(dt) {
-      const roleSpeed = (ROLES[state.myRole] && ROLES[state.myRole].speed) || 260;
+      const stats = getPlayerStats(state.myClass);
       let dx = 0;
       let dy = 0;
 
@@ -1605,43 +2121,49 @@
       if (keys['a'] || keys['arrowleft']) dx -= 1;
       if (keys['d'] || keys['arrowright']) dx += 1;
 
-      if (pointerTarget) {
-        const tdx = pointerTarget.x - state.localX;
-        const tdy = pointerTarget.y - state.localY;
-        const dist = Math.hypot(tdx, tdy);
-        if (dist > 14) {
-          dx = tdx / dist;
-          dy = tdy / dist;
-        }
+      // Special badge zona speed bonus
+      let actualSpeed = stats.speed;
+      if (stats.hasZonaBoost) {
+        const dToOvum = Math.hypot(state.localX - WORLD_CX, state.localY - WORLD_CY);
+        if (dToOvum < 220) actualSpeed *= 1.15;
       }
 
       if (dx !== 0 || dy !== 0) {
         const len = Math.hypot(dx, dy);
-        state.localX += (dx / len) * roleSpeed * dt;
-        state.localY += (dy / len) * roleSpeed * dt;
+        state.localX += (dx / len) * actualSpeed * dt;
+        state.localY += (dy / len) * actualSpeed * dt;
 
-        state.localX = Math.max(30, Math.min(CANVAS.width - 30, state.localX));
-        state.localY = Math.max(30, Math.min(CANVAS.height - 30, state.localY));
+        state.localX = Math.max(30, Math.min(WORLD_WIDTH - 30, state.localX));
+        state.localY = Math.max(30, Math.min(WORLD_HEIGHT - 30, state.localY));
+      }
+
+      // Continuous firing for Machinegun
+      if (state.isMouseDown && stats.type === 'bullet_auto') {
+        handleAttackTrigger();
       }
 
       if (state.players[SENDER_ID]) {
         state.players[SENDER_ID].x = state.localX;
         state.players[SENDER_ID].y = state.localY;
+        state.players[SENDER_ID].angle = state.aimAngle;
       }
 
-      // Throttled movement publishing
+      // Throttled Network Dispatch (~18Hz)
       const now = performance.now();
       if (now - state.lastMoveSendTime > 55) {
         const movedDist = Math.hypot(state.localX - state.lastSentX, state.localY - state.lastSentY);
-        if (movedDist >= 2.0) {
+        const angDiff = Math.abs(normalizeAngle(state.aimAngle - state.lastSentAngle));
+        if (movedDist >= 2.0 || angDiff >= 0.08) {
           state.lastMoveSendTime = now;
           state.lastSentX = state.localX;
           state.lastSentY = state.localY;
+          state.lastSentAngle = state.aimAngle;
           publishMessage({
             type: 'PLAYER_MOVE',
             sender: SENDER_ID,
             x: Math.round(state.localX),
-            y: Math.round(state.localY)
+            y: Math.round(state.localY),
+            angle: Math.round(state.aimAngle * 100) / 100
           });
         }
       }
@@ -1654,6 +2176,7 @@
           if (p.targetX !== undefined && p.targetY !== undefined) {
             p.x += (p.targetX - p.x) * 0.25;
             p.y += (p.targetY - p.y) * 0.25;
+            p.angle += normalizeAngle(p.targetAngle - p.angle) * 0.3;
           }
         }
       }
@@ -1716,6 +2239,8 @@
       const victimC = document.getElementById('resultVictimCanvas');
 
       modal.classList.remove('hidden');
+      document.getElementById('resultCoinEarned').innerText = state.sessionEarnedCoins;
+      document.getElementById('resultTotalCoin').innerText = storage.coins;
 
       if (isWin) {
         card.className = 'comic-box bg-slate-900 border-4 border-yellow-400 w-full max-w-md rounded-2xl p-6 text-center text-white relative';
@@ -1729,7 +2254,7 @@
         icon.innerText = '👶💥';
         title.className = 'title-font text-3xl md:text-4xl text-pink-400 text-shadow-pop mb-1';
         title.innerText = '生命の神秘、大勝利！';
-        subtitle.innerText = '防衛軍の敗北… 1匹のオスライオンが卵子に到達！';
+        subtitle.innerText = '防衛軍の完全敗北… 1匹のオスライオンが卵子に到達！';
         victimBox.classList.remove('hidden');
 
         const ctxV = victimC.getContext('2d');
@@ -1741,98 +2266,55 @@
     function render() {
       CTX.clearRect(0, 0, CANVAS.width, CANVAS.height);
 
-      const cx = CANVAS.width / 2;
-      const cy = CANVAS.height / 2;
+      // Letterbox backdrop
+      CTX.fillStyle = '#05000c';
+      CTX.fillRect(0, 0, CANVAS.width, CANVAS.height);
 
-      // Biological uterine background
-      drawBiologicalBackground(CTX, cx, cy);
+      // Apply Matrix Translation and Scale for Logical Coordinate System
+      CTX.save();
+      CTX.translate(vpOffsetX, vpOffsetY);
+      CTX.scale(vpScale, vpScale);
 
-      // Persistent Field Entities
-      drawFieldEntities(CTX);
+      // Biological uterine field
+      drawBiologicalBackground(CTX);
 
       // Central Ovum
-      drawOvum(CTX, cx, cy);
+      drawOvum(CTX);
 
       // Sperms Swarm
       drawSperms(CTX);
 
-      // Skill Shockwaves
-      drawSkillEffects(CTX);
+      // Projectiles & Weapon Swings
+      drawCombatEntities(CTX);
 
-      // Defenders
+      // Defenders (Players)
       drawPlayers(CTX);
 
       // Particles
       drawParticles(CTX);
+
+      CTX.restore();
     }
 
-    function drawBiologicalBackground(ctx, cx, cy) {
-      const gradient = ctx.createRadialGradient(cx, cy, 30, cx, cy, Math.max(CANVAS.width, CANVAS.height) * 0.75);
-      gradient.addColorStop(0, 'rgba(88, 28, 135, 0.45)');
-      gradient.addColorStop(0.65, 'rgba(28, 8, 55, 0.8)');
-      gradient.addColorStop(1, 'rgba(8, 0, 18, 0.98)');
+    function drawBiologicalBackground(ctx) {
+      const gradient = ctx.createRadialGradient(WORLD_CX, WORLD_CY, 40, WORLD_CX, WORLD_CY, 750);
+      gradient.addColorStop(0, '#270846');
+      gradient.addColorStop(0.65, '#130026');
+      gradient.addColorStop(1, '#070012');
       ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, CANVAS.width, CANVAS.height);
+      ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
+      ctx.strokeStyle = 'rgba(236, 72, 153, 0.15)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(4, 4, WORLD_WIDTH - 8, WORLD_HEIGHT - 8);
     }
 
-    function drawFieldEntities(ctx) {
-      // Acid Pools
-      state.acidPools.forEach(p => {
-        ctx.save();
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.35)';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#34d399';
-        ctx.stroke();
-        ctx.restore();
-      });
-
-      // Barricades
-      state.barricades.forEach(b => {
-        ctx.save();
-        ctx.fillStyle = 'rgba(6, 182, 212, 0.4)';
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = '#22d3ee';
-        ctx.stroke();
-        ctx.font = 'bold 12px sans-serif';
-        ctx.fillStyle = '#cffafe';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('🛡️ゼリー壁', b.x, b.y);
-        ctx.restore();
-      });
-
-      // Blackholes
-      state.blackholes.forEach(bh => {
-        ctx.save();
-        ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
-        ctx.beginPath();
-        ctx.arc(bh.x, bh.y, bh.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#fbbf24';
-        ctx.setLineDash([6, 6]);
-        ctx.lineDashOffset = -performance.now() * 0.05;
-        ctx.stroke();
-        ctx.restore();
-      });
-    }
-
-    function drawOvum(ctx, cx, cy) {
-      const ovumRadius = 60;
-      const barrierRadius = 92;
-
-      // Zona Pellucida Barrier
+    function drawOvum(ctx) {
       if (state.ovumHealth > 0) {
         ctx.save();
         const shieldAlpha = Math.max(0.2, state.ovumHealth / 100);
         ctx.beginPath();
-        ctx.arc(cx, cy, barrierRadius, 0, Math.PI * 2);
+        ctx.arc(WORLD_CX, WORLD_CY, BARRIER_RADIUS, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(56, 189, 248, ${shieldAlpha * 0.22})`;
         ctx.fill();
         ctx.lineWidth = 4;
@@ -1843,14 +2325,13 @@
         ctx.restore();
       }
 
-      // Female Lion Nucleus
-      drawCircleCroppedImage(ctx, images.femaleLion, cx, cy, ovumRadius, '#ec4899', 6);
+      drawCircleCroppedImage(ctx, images.femaleLion, WORLD_CX, WORLD_CY, OVUM_RADIUS, '#ec4899', 6);
 
       ctx.save();
-      ctx.font = 'bold 12px "M PLUS Rounded 1c"';
+      ctx.font = 'bold 13px "M PLUS Rounded 1c"';
       ctx.fillStyle = '#fbcfe8';
       ctx.textAlign = 'center';
-      ctx.fillText('メスライオン卵子 (核)', cx, cy + ovumRadius + 22);
+      ctx.fillText('メスライオン卵子 (核)', WORLD_CX, WORLD_CY + OVUM_RADIUS + 22);
       ctx.restore();
     }
 
@@ -1873,16 +2354,16 @@
           const segY = sp.y + Math.sin(backAngle) * segDist + Math.sin(perpAngle) * wave;
           ctx.lineTo(segX, segY);
         }
-        ctx.strokeStyle = (sp.slowTimer > 0 || sp.slowed) ? '#10b981' : '#fde047';
+        ctx.strokeStyle = '#fde047';
         ctx.lineWidth = Math.max(2, sp.radius * 0.25);
         ctx.lineCap = 'round';
         ctx.stroke();
 
         // Male Lion Face
-        const borderColor = sp.type === 'tank' ? '#ef4444' : ((sp.slowTimer > 0 || sp.slowed) ? '#10b981' : '#eab308');
+        const borderColor = sp.type === 'tank' ? '#ef4444' : '#eab308';
         drawCircleCroppedImage(ctx, images.maleLion, sp.x, sp.y, sp.radius, borderColor, 3);
 
-        if (sp.maxHp > 1) {
+        if (sp.maxHp > 1.5) {
           const bw = sp.radius * 1.6;
           const bh = 4;
           const bx = sp.x - bw / 2;
@@ -1897,66 +2378,80 @@
       }
     }
 
-    function drawSkillEffects(ctx) {
-      for (let i = state.effects.length - 1; i >= 0; i--) {
-        const ef = state.effects[i];
+    function drawCombatEntities(ctx) {
+      // Weapon Attack Visuals
+      state.attackVisuals.forEach(v => {
         ctx.save();
-        ctx.globalAlpha = ef.alpha;
+        const progress = 1 - (v.life / v.maxLife);
+        ctx.globalAlpha = 1 - progress * 0.8;
 
-        if (ef.role === 'slipper') {
-          ctx.save();
-          ctx.translate(ef.x, ef.y);
-          ctx.rotate(ef.angle);
-          ctx.fillStyle = '#f43f5e';
+        if (v.type === 'slash') {
           ctx.beginPath();
-          ctx.roundRect(-24, -58, 48, 116, 24);
-          ctx.fill();
-          ctx.lineWidth = 4;
-          ctx.strokeStyle = '#000';
+          ctx.arc(v.x, v.y, v.radius, v.angle - Math.PI * 0.35, v.angle + Math.PI * 0.35);
+          ctx.lineWidth = 14;
+          ctx.strokeStyle = v.color;
           ctx.stroke();
-          ctx.restore();
-
+        } else if (v.type === 'spear_thrust') {
+          const tx = v.x + Math.cos(v.angle) * v.length;
+          const ty = v.y + Math.sin(v.angle) * v.length;
           ctx.beginPath();
-          ctx.arc(ef.x, ef.y, ef.radius * (1.3 - ef.alpha * 0.5), 0, Math.PI * 2);
-          ctx.lineWidth = 5;
-          ctx.strokeStyle = '#f43f5e';
+          ctx.moveTo(v.x, v.y);
+          ctx.lineTo(tx, ty);
+          ctx.lineWidth = 10;
+          ctx.strokeStyle = v.color;
           ctx.stroke();
         }
-
         ctx.restore();
-        ef.alpha -= 0.055;
-        if (ef.alpha <= 0) state.effects.splice(i, 1);
-      }
+      });
+
+      // Projectiles
+      state.projectiles.forEach(p => {
+        ctx.save();
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#fff';
+        ctx.stroke();
+        ctx.restore();
+      });
     }
 
     function drawPlayers(ctx) {
       for (let id in state.players) {
         const p = state.players[id];
-        const role = ROLES[p.role] || ROLES.slipper;
+        const cls = CHAR_CLASSES[p.classId] || CHAR_CLASSES.brawler;
         const isMe = (p.id === SENDER_ID);
 
         ctx.save();
+        // Shadow
         ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         ctx.beginPath();
         ctx.ellipse(p.x, p.y + 16, 18, 8, 0, 0, Math.PI * 2);
         ctx.fill();
 
+        // Body
         ctx.beginPath();
         ctx.arc(p.x, p.y, 20, 0, Math.PI * 2);
-        ctx.fillStyle = role.color;
+        ctx.fillStyle = cls.color;
         ctx.fill();
         ctx.lineWidth = 3;
         ctx.strokeStyle = isMe ? '#fbbf24' : '#000';
         ctx.stroke();
 
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 12px sans-serif';
+        // Weapon Pointer in Hand
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        ctx.font = '16px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        const roleChar = p.role === 'slipper' ? '🩴' : (p.role === 'acid' ? '🧪' : (p.role === 'repair' ? '🧱' : '🌪️'));
-        ctx.fillText(roleChar, p.x, p.y);
+        ctx.fillText(cls.icon, 24, 0);
+        ctx.restore();
 
-        ctx.font = 'bold 11px "M PLUS Rounded 1c"';
+        // Name
+        ctx.font = 'bold 12px "M PLUS Rounded 1c"';
         ctx.fillStyle = isMe ? '#fef08a' : '#fff';
         ctx.textAlign = 'center';
         ctx.fillText(p.name + (isMe ? ' (あなた)' : ''), p.x, p.y - 25);
@@ -1977,7 +2472,7 @@
 
         pt.x += pt.vx;
         pt.y += pt.vy;
-        pt.alpha -= 0.038;
+        pt.alpha -= 0.04;
         if (pt.alpha <= 0) state.particles.splice(i, 1);
       }
     }
@@ -1989,6 +2484,7 @@
 
       if (state.gameRunning) {
         updateLocalPlayerMovement(dt);
+        updateProjectiles(dt);
         interpolateRemoteEntities();
 
         if (state.isHost) {
@@ -1997,21 +2493,6 @@
             triggerGameWin();
           }
 
-          // Entity lifetime updates
-          for (let i = state.acidPools.length - 1; i >= 0; i--) {
-            state.acidPools[i].life -= dt;
-            if (state.acidPools[i].life <= 0) state.acidPools.splice(i, 1);
-          }
-          for (let i = state.barricades.length - 1; i >= 0; i--) {
-            state.barricades[i].life -= dt;
-            if (state.barricades[i].life <= 0) state.barricades.splice(i, 1);
-          }
-          for (let i = state.blackholes.length - 1; i >= 0; i--) {
-            state.blackholes[i].life -= dt;
-            if (state.blackholes[i].life <= 0) state.blackholes.splice(i, 1);
-          }
-
-          // Spawning
           state.spawnTimer += dt;
           const playerCount = Math.max(1, Object.keys(state.players).length);
           const baseInterval = Math.max(0.35, 1.4 - (playerCount * 0.08) - (60 - state.timeLeft) * 0.02);
@@ -2035,8 +2516,7 @@
               hp: s.hp,
               mhp: s.maxHp,
               type: s.type,
-              r: s.radius,
-              sl: s.slowTimer > 0
+              r: s.radius
             }));
 
             publishMessage({
@@ -2045,10 +2525,7 @@
               status: 'RUNNING',
               ovumHealth: Math.round(state.ovumHealth),
               timeLeft: Math.ceil(state.timeLeft),
-              sperms: compactSperms,
-              acidPools: state.acidPools,
-              barricades: state.barricades,
-              blackholes: state.blackholes
+              sperms: compactSperms
             });
           }
         }
@@ -2058,19 +2535,6 @@
         const healthPercent = Math.max(0, Math.min(100, (state.ovumHealth / state.ovumMaxHealth) * 100));
         document.getElementById('hudShieldBar').style.width = `${healthPercent}%`;
         document.getElementById('hudShieldText').innerText = `${Math.round(healthPercent)}%`;
-
-        // Skill cooldown HUD
-        const role = ROLES[state.myRole];
-        const elapsed = (performance.now() / 1000) - state.lastActionTime;
-        const cdLeft = Math.max(0, role.cooldown - elapsed);
-        const cdLabel = document.getElementById('skillCdLabel');
-        if (cdLeft > 0) {
-          cdLabel.innerText = cdLeft.toFixed(1) + 's';
-          cdLabel.className = 'text-[10px] text-red-700 font-black';
-        } else {
-          cdLabel.innerText = 'READY';
-          cdLabel.className = 'text-[10px] text-green-950 font-black';
-        }
       }
 
       render();
