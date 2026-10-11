@@ -30,7 +30,7 @@
   <!-- 上部トースト通知 -->
   <div id="toastContainer" class="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center space-y-2"></div>
 
-  <!-- HUD上部バー (ゲームプレイ中常時表示) -->
+  <!-- HUD上部バー -->
   <div id="hudTop" class="hidden absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
     <div class="flex items-center space-x-3 pointer-events-auto bg-slate-900/90 border-2 border-rose-500 rounded-2xl px-4 py-2 comic-shadow">
       <div>
@@ -49,7 +49,6 @@
       </div>
     </div>
 
-    <!-- コイン & サウンド設定 -->
     <div class="flex items-center space-x-2 pointer-events-auto">
       <div class="flex items-center space-x-2 bg-slate-900/90 border-2 border-amber-400 rounded-2xl px-3 py-2 comic-shadow">
         <span class="text-xl">🪙</span>
@@ -61,7 +60,7 @@
     </div>
   </div>
 
-  <!-- 自機HP HUD (画面左下) -->
+  <!-- 自機HP HUD -->
   <div id="hudPlayerHp" class="hidden absolute bottom-4 left-4 pointer-events-none z-10">
     <div class="bg-slate-900/90 border-2 border-emerald-500 rounded-2xl p-3 comic-shadow pointer-events-auto">
       <div class="flex justify-between items-center text-xs font-bold text-emerald-300 mb-1">
@@ -263,7 +262,7 @@
 
   <script>
     /* =====================================================================
-       子宮防衛軍 (Shikyuu Defense Force - SDF) 完全復元版
+       子宮防衛軍 (Shikyuu Defense Force - SDF) 完全統合スクリプト
        ===================================================================== */
 
     function showToast(msg, bg = 'bg-rose-600') {
@@ -279,7 +278,7 @@
       }, 2200);
     }
 
-    // --- オーディオシンセ ---
+    // --- Web Audio API によるゼロレイテンシーB級効果音 ---
     const AudioEngine = {
       ctx: null, enabled: true,
       init() {
@@ -338,7 +337,7 @@
       }
     };
 
-    // --- 8兵種定義 ---
+    // --- 8兵種定義 (コイン数爆上げ) ---
     const CHARACTERS = [
       { id: 'fist', name: '素手兵', cost: 0, desc: 'ビンタで確実に殴り倒す！', cd: 0.35, range: 75, dmg: 22, kb: 160, speed: 250, auto: false },
       { id: 'knife', name: 'ナイフ兵', cost: 15000, desc: '超高速連撃アサシン！', cd: 0.14, range: 55, dmg: 14, kb: 60, speed: 280, auto: false },
@@ -386,7 +385,7 @@
 
     const WORLD = { width: 2600, height: 2000, ovumX: 1300, ovumY: 1000, ovumRadius: 85, barrierRadius: 130 };
 
-    // --- オフスクリーン・スタンプ事前キャッシュ (高速化の鍵) ---
+    // --- オフスクリーン・事前丸型スタンプキャッシュ ---
     const ImageStamp = {
       maleStamp: null,
       femaleStamp: null,
@@ -475,7 +474,6 @@
       localStorage.setItem('sdf_badges', JSON.stringify(state.charBadges));
     }
 
-    // バッジ能力値合算計算
     function getBadgeMultipliers(charId) {
       const badges = state.charBadges[charId] || [];
       const m = { spd: 1.0, atk: 1.0, rng: 1.0, kb: 1.0, coin: 1.0 };
@@ -590,7 +588,6 @@
         state.projectiles.push({ x: state.localX, y: state.localY, sx: state.localX, sy: state.localY, vx: Math.cos(ang) * 920, vy: Math.sin(ang) * 920, maxD: rng, type: 'bullet', dmg, kb, ang });
       } else if (c.isMagic) {
         AudioEngine.play('magic');
-        // 左右2連ホーミング弾
         state.projectiles.push({ x: state.localX, y: state.localY, sx: state.localX, sy: state.localY, vx: Math.cos(ang - 0.22) * 580, vy: Math.sin(ang - 0.22) * 580, maxD: rng, type: 'magic', dmg, kb, ang: ang - 0.22 });
         state.projectiles.push({ x: state.localX, y: state.localY, sx: state.localX, sy: state.localY, vx: Math.cos(ang + 0.22) * 580, vy: Math.sin(ang + 0.22) * 580, maxD: rng, type: 'magic', dmg, kb, ang: ang + 0.22 });
       } else {
@@ -611,7 +608,9 @@
       const arcSpread = charId === 'knife' ? 0.9 : (charId === 'spear' ? 0.45 : 1.3);
       state.enemies.forEach(e => {
         const dx = e.x - px, dy = e.y - py;
-        if (Math.hypot(dx, dy) <= rng + e.rad) {
+        const distSq = dx * dx + dy * dy;
+        const hitDist = rng + e.rad;
+        if (distSq <= hitDist * hitDist) {
           let diff = Math.abs(Math.atan2(dy, dx) - ang);
           while (diff > Math.PI) diff -= Math.PI * 2;
           if (Math.abs(diff) <= arcSpread * 0.5) hitEnemy(e, dmg, kb, Math.cos(ang), Math.sin(ang));
@@ -710,10 +709,8 @@
     function update(dt) {
       const me = state.players.find(p => p.id === state.myId);
 
-      // 自機移動 & ダウン時救助受付
       if (me) {
         if (me.downed) {
-          // 近くにいる味方が救助
           const saviors = state.players.filter(p => p.id !== state.myId && !p.downed && Math.hypot(p.x - state.localX, p.y - state.localY) < 70);
           if (saviors.length > 0) {
             state.localReviveProgress += dt * 0.5;
@@ -747,27 +744,24 @@
         }
       }
 
-      // オート連射
       if (state.isMouseDown) {
         const c = CHARACTERS.find(ch => ch.id === state.selectedChar) || CHARACTERS[0];
         if (c.auto) tryAttack();
       }
 
-      // リジェネ回復
       if (state.shopBuffs.regen > 0 && me && !me.downed && me.hp < me.maxHp) {
         me.hp = Math.min(me.maxHp, me.hp + state.shopBuffs.regen * dt);
       }
 
-      // 弾丸
       for (let i = state.projectiles.length - 1; i >= 0; i--) {
         const p = state.projectiles[i];
 
-        // 魔法ホーミング
         if (p.type === 'magic' && state.enemies.length > 0) {
-          let closest = null, minD = 320;
+          let closest = null, minDSq = 320 * 320;
           state.enemies.forEach(e => {
-            const d = Math.hypot(e.x - p.x, e.y - p.y);
-            if (d < minD) { minD = d; closest = e; }
+            const dx = e.x - p.x, dy = e.y - p.y;
+            const dSq = dx * dx + dy * dy;
+            if (dSq < minDSq) { minDSq = dSq; closest = e; }
           });
           if (closest) {
             const targetAng = Math.atan2(closest.y - p.y, closest.x - p.x);
@@ -777,7 +771,8 @@
         }
 
         p.x += p.vx * dt; p.y += p.vy * dt;
-        if (Math.hypot(p.x - p.sx, p.y - p.sy) >= p.maxD) {
+        const travDx = p.x - p.sx, travDy = p.y - p.sy;
+        if (travDx * travDx + travDy * travDy >= p.maxD * p.maxD) {
           if (p.type === 'bomb') explodeBomb(p.x, p.y, p.dmg, p.kb);
           state.projectiles.splice(i, 1);
           continue;
@@ -785,7 +780,9 @@
 
         let hit = false;
         for (const e of state.enemies) {
-          if (Math.hypot(e.x - p.x, e.y - p.y) <= e.rad + 8) {
+          const hDx = e.x - p.x, hDy = e.y - p.y;
+          const hitRad = e.rad + 8;
+          if (hDx * hDx + hDy * hDy <= hitRad * hitRad) {
             hit = true;
             if (p.type === 'bomb') explodeBomb(p.x, p.y, p.dmg, p.kb);
             else if (state.isHost) hitEnemy(e, p.dmg, p.kb, Math.cos(p.ang), Math.sin(p.ang));
@@ -795,7 +792,6 @@
         if (hit) state.projectiles.splice(i, 1);
       }
 
-      // タレット
       state.turrets.forEach(t => {
         t.cd = (t.cd || 0) - dt;
         if (t.cd <= 0 && state.enemies.length > 0) {
@@ -807,7 +803,6 @@
         }
       });
 
-      // 敵シミュレーション
       if (state.isHost) {
         if (state.spawnQ && state.spawnQ.length > 0) {
           for (let i = state.spawnQ.length - 1; i >= 0; i--) {
@@ -823,7 +818,6 @@
         state.enemies.forEach(e => {
           if (e.atkCd > 0) e.atkCd -= dt;
 
-          // ボススキル
           if (e.isB) {
             e.skillTimer -= dt;
             if (e.skillTimer <= 0) {
@@ -843,21 +837,26 @@
           }
 
           let tx = WORLD.ovumX, ty = WORLD.ovumY;
-          if (alive.length > 0 && Math.hypot(alive[0].x - e.x, alive[0].y - e.y) < 260) {
-            tx = alive[0].x; ty = alive[0].y;
+          if (alive.length > 0) {
+            const pDx = alive[0].x - e.x, pDy = alive[0].y - e.y;
+            if (pDx * pDx + pDy * pDy < 260 * 260) {
+              tx = alive[0].x; ty = alive[0].y;
+            }
           }
           const tdx = tx - e.x, tdy = ty - e.y, td = Math.hypot(tdx, tdy) || 0.001;
           e.ang = Math.atan2(tdy, tdx);
           let sp = e.spd;
-          if (state.acidField && Math.hypot(WORLD.ovumX - e.x, WORLD.ovumY - e.y) < 320) sp *= 0.65;
+          const ovDx = WORLD.ovumX - e.x, ovDy = WORLD.ovumY - e.y;
+          if (state.acidField && (ovDx * ovDx + ovDy * ovDy < 320 * 320)) sp *= 0.65;
 
           e.x += (tdx / td) * sp * dt + e.vx * dt;
           e.y += (tdy / td) * sp * dt + e.vy * dt;
           e.vx *= 0.88; e.vy *= 0.88;
 
-          // プレイヤー接触噛みつき攻撃
           alive.forEach(p => {
-            if (Math.hypot(p.x - e.x, p.y - e.y) < e.rad + 20 && e.atkCd <= 0) {
+            const aDx = p.x - e.x, aDy = p.y - e.y;
+            const aRad = e.rad + 20;
+            if (aDx * aDx + aDy * aDy < aRad * aRad && e.atkCd <= 0) {
               e.atkCd = 0.85;
               p.hp = Math.max(0, p.hp - e.atk);
               AudioEngine.play('bite');
@@ -866,27 +865,28 @@
             }
           });
 
-          // 卵子接触
-          const dOvum = Math.hypot(WORLD.ovumX - e.x, WORLD.ovumY - e.y);
+          const dOvumSq = ovDx * ovDx + ovDy * ovDy;
           if (state.barrierHp > 0) {
-            if (dOvum <= WORLD.barrierRadius + e.rad) {
+            const bRad = WORLD.barrierRadius + e.rad;
+            if (dOvumSq <= bRad * bRad) {
               state.barrierHp = Math.max(0, state.barrierHp - (e.isB ? 25 : 8));
               addText(e.x, e.y, 'BARRIER HIT', '#ec4899');
               if (!e.isB) killEnemy(e);
             }
-          } else if (dOvum <= WORLD.ovumRadius + e.rad) {
-            triggerGameOver();
+          } else {
+            const oRad = WORLD.ovumRadius + e.rad;
+            if (dOvumSq <= oRad * oRad) {
+              triggerGameOver();
+            }
           }
         });
 
         syncEnemies();
 
-        // ウェーブクリア判定
         if (state.enemies.length === 0 && (!state.spawnQ || state.spawnQ.length === 0)) {
           openShop();
         }
       } else {
-        // クライアント側自律移動（デッドレコニング）
         state.enemies.forEach(e => {
           const tdx = WORLD.ovumX - e.x, tdy = WORLD.ovumY - e.y, td = Math.hypot(tdx, tdy) || 0.001;
           e.x += (tdx / td) * e.spd * dt;
@@ -898,7 +898,6 @@
         });
       }
 
-      // パーティクル＆テキスト
       for (let i = state.particles.length - 1; i >= 0; i--) {
         const p = state.particles[i];
         p.x += p.vx * dt; p.y += p.vy * dt; p.l -= dt;
@@ -910,7 +909,6 @@
         if (t.l <= 0) state.texts.splice(i, 1);
       }
 
-      // カメラ追従
       state.camera.x += (state.localX - state.camera.x) * 0.15;
       state.camera.y += (state.localY - state.camera.y) * 0.15;
 
@@ -925,7 +923,9 @@
       }
       if (state.isHost) {
         state.enemies.forEach(e => {
-          if (Math.hypot(e.x - bx, e.y - by) <= 150 + e.rad) {
+          const dx = e.x - bx, dy = e.y - by;
+          const r = 150 + e.rad;
+          if (dx * dx + dy * dy <= r * r) {
             const ang = Math.atan2(e.y - by, e.x - bx);
             hitEnemy(e, dmg, kb, Math.cos(ang), Math.sin(ang));
           }
@@ -933,7 +933,7 @@
       }
     }
 
-    // --- 爆速描画（スタンプ方式＆HUDナビゲーション） ---
+    // --- 高速Canvas描画 ---
     function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.save();
@@ -950,27 +950,23 @@
         ctx.strokeStyle = 'rgba(16, 185, 129, 0.25)'; ctx.lineWidth = 3; ctx.stroke();
       }
 
-      // タレット
       state.turrets.forEach(t => {
         ctx.beginPath(); ctx.arc(t.x, t.y, 14, 0, Math.PI * 2);
         ctx.fillStyle = '#38bdf8'; ctx.fill();
         ctx.strokeStyle = '#0284c7'; ctx.lineWidth = 2.5; ctx.stroke();
       });
 
-      // バリア
       if (state.barrierHp > 0) {
         ctx.beginPath();
         ctx.arc(WORLD.ovumX, WORLD.ovumY, WORLD.barrierRadius, 0, Math.PI * 2);
         ctx.strokeStyle = '#f43f5e'; ctx.lineWidth = 6; ctx.stroke();
       }
 
-      // 卵子（スタンプ事前描画）
       if (ImageStamp.femaleStamp) {
         const r = WORLD.ovumRadius;
         ctx.drawImage(ImageStamp.femaleStamp, WORLD.ovumX - r, WORLD.ovumY - r, r * 2, r * 2);
       }
 
-      // 敵（精子）
       const now = performance.now();
       state.enemies.forEach(e => {
         const tailLen = e.isB ? 60 : 35;
@@ -1001,20 +997,17 @@
         }
       });
 
-      // 弾丸
       state.projectiles.forEach(p => {
         ctx.beginPath(); ctx.arc(p.x, p.y, p.type === 'bomb' ? 7 : 4, 0, Math.PI * 2);
         ctx.fillStyle = p.type === 'bomb' ? '#f97316' : (p.type === 'magic' ? '#c084fc' : '#facc15');
         ctx.fill();
       });
 
-      // プレイヤー
       state.players.forEach(p => {
         const isMe = (p.id === state.myId);
         ctx.save();
         ctx.translate(p.x, p.y);
 
-        // 武器
         ctx.save();
         ctx.rotate(p.ang || 0);
         ctx.fillStyle = '#64748b';
@@ -1042,7 +1035,6 @@
         ctx.restore();
       });
 
-      // パーティクル＆テキスト
       state.particles.forEach(p => {
         ctx.fillStyle = p.col;
         ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
@@ -1054,7 +1046,7 @@
 
       ctx.restore();
 
-      // ナビゲーションHUD（完全復元）
+      // HUDレーダー矢印
       drawPointer(WORLD.ovumX, WORLD.ovumY, '#f43f5e', '👑 卵子');
       const boss = state.enemies.find(e => e.isB);
       if (boss) drawPointer(boss.x, boss.y, '#f59e0b', '⚠️ BOSS');
@@ -1079,16 +1071,39 @@
       ctx.restore();
     }
 
+    // DOMキャッシュ（リフロー負荷完全撲滅）
+    const domCache = { pName: '', pHpTxt: '', pHpW: '', bTxt: '', bW: '' };
     function updateHUD() {
       const me = state.players.find(p => p.id === state.myId);
       if (me) {
-        document.getElementById('hudPlayerName').innerText = me.name + (me.downed ? ' (SOS!)' : '');
-        document.getElementById('hudPlayerHpTxt').innerText = `${Math.max(0, Math.round(me.hp))} / ${me.maxHp}`;
-        document.getElementById('hudPlayerHpBar').style.width = `${Math.max(0, (me.hp / me.maxHp) * 100)}%`;
+        const pNameStr = me.name + (me.downed ? ' (SOS!)' : '');
+        if (domCache.pName !== pNameStr) {
+          document.getElementById('hudPlayerName').innerText = pNameStr;
+          domCache.pName = pNameStr;
+        }
+        const pHpStr = `${Math.max(0, Math.round(me.hp))} / ${me.maxHp}`;
+        if (domCache.pHpTxt !== pHpStr) {
+          document.getElementById('hudPlayerHpTxt').innerText = pHpStr;
+          domCache.pHpTxt = pHpStr;
+        }
+        const pWStr = `${Math.max(0, (me.hp / me.maxHp) * 100)}%`;
+        if (domCache.pHpW !== pWStr) {
+          document.getElementById('hudPlayerHpBar').style.width = pWStr;
+          domCache.pHpW = pWStr;
+        }
       }
-      document.getElementById('hudBarrierHpTxt').innerText = `${state.barrierHp} / ${state.maxBarrierHp}`;
-      document.getElementById('hudBarrierHpBar').style.width = `${Math.max(0, (state.barrierHp / state.maxBarrierHp) * 100)}%`;
+      const bTxtStr = `${state.barrierHp} / ${state.maxBarrierHp}`;
+      if (domCache.bTxt !== bTxtStr) {
+        document.getElementById('hudBarrierHpTxt').innerText = bTxtStr;
+        domCache.bTxt = bTxtStr;
+      }
+      const bWStr = `${Math.max(0, (state.barrierHp / state.maxBarrierHp) * 100)}%`;
+      if (domCache.bW !== bWStr) {
+        document.getElementById('hudBarrierHpBar').style.width = bWStr;
+        domCache.bW = bWStr;
+      }
     }
+
     function updateHudCoins() {
       document.getElementById('hudCoins').innerText = state.coins;
       const sc = document.getElementById('shopCoins');
@@ -1099,7 +1114,6 @@
     function openShop() {
       state.status = 'SHOP';
       state.readySet.clear();
-      // 全員全快復活！
       state.players.forEach(p => { p.downed = false; p.hp = p.maxHp; });
       AudioEngine.play('fanfare');
       showToast('🎉 ウェーブクリア！部隊全員全快復活！', 'bg-emerald-600');
