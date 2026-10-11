@@ -162,37 +162,52 @@
         </div>
       </div>
 
-      <!-- アクション：部屋を立てる / 参加する の2分割カード -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+      <!-- アクション：部屋を立てる / 参加する / オフライン出撃 の3分割カード -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
         <!-- 部屋を立てる (ホスト) -->
-        <div class="bg-gradient-to-br from-indigo-950/60 to-purple-950/40 border border-indigo-500/50 rounded-2xl p-4 flex flex-col justify-between hover:border-indigo-400 transition shadow-lg">
+        <div class="bg-gradient-to-br from-indigo-950/60 to-purple-950/40 border border-indigo-500/50 rounded-2xl p-3.5 flex flex-col justify-between hover:border-indigo-400 transition shadow-lg">
           <div>
             <div class="flex items-center gap-2 text-indigo-300 font-black text-sm mb-1">
               <i class="fa-solid fa-tower-broadcast text-indigo-400"></i>部屋を立てる
             </div>
-            <p class="text-xs text-slate-400 mb-4 leading-relaxed">
-              新しいルームを自動発行し、部隊のホストとして仲間を招集します。
+            <p class="text-[11px] text-slate-400 mb-3 leading-relaxed">
+              新しいルームを発行し、部隊ホストとして仲間を招集します。
             </p>
           </div>
-          <button id="btnCreateRoom" class="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 font-black text-white text-sm rounded-xl shadow-lg shadow-indigo-700/30 active:scale-95 transition">
-            <i class="fa-solid fa-plus-circle mr-1.5"></i>新設して待機
+          <button id="btnCreateRoom" class="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 font-black text-white text-xs rounded-xl shadow-lg shadow-indigo-700/30 active:scale-95 transition">
+            <i class="fa-solid fa-plus-circle mr-1"></i>新設して待機
           </button>
         </div>
 
         <!-- 部屋に参加する (ゲスト) -->
-        <div class="bg-gradient-to-br from-emerald-950/60 to-teal-950/40 border border-emerald-500/50 rounded-2xl p-4 flex flex-col justify-between hover:border-emerald-400 transition shadow-lg">
+        <div class="bg-gradient-to-br from-emerald-950/60 to-teal-950/40 border border-emerald-500/50 rounded-2xl p-3.5 flex flex-col justify-between hover:border-emerald-400 transition shadow-lg">
           <div>
             <div class="flex items-center gap-2 text-emerald-300 font-black text-sm mb-1">
               <i class="fa-solid fa-right-to-bracket text-emerald-400"></i>部屋に参加する
             </div>
-            <p class="text-xs text-slate-400 mb-2 leading-relaxed">
-              友だちから教えてもらったルームコードを入力して合流します。
+            <p class="text-[11px] text-slate-400 mb-1.5 leading-relaxed">
+              ルームコードを入力して合流します。
             </p>
             <input id="inputRoomCode" type="text" maxlength="8" placeholder="例: SDF88"
-              class="w-full uppercase bg-slate-900 border border-slate-600 focus:border-emerald-500 focus:outline-none rounded-xl px-3 py-2 text-sm font-black text-center text-white mb-3 tracking-widest">
+              class="w-full uppercase bg-slate-900 border border-slate-600 focus:border-emerald-500 focus:outline-none rounded-xl px-2.5 py-1.5 text-xs font-black text-center text-white mb-2 tracking-widest">
           </div>
-          <button id="btnJoinRoom" class="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 font-black text-white text-sm rounded-xl shadow-lg shadow-emerald-700/30 active:scale-95 transition">
-            <i class="fa-solid fa-arrow-right-to-bracket mr-1.5"></i>参戦する
+          <button id="btnJoinRoom" class="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 font-black text-white text-xs rounded-xl shadow-lg shadow-emerald-700/30 active:scale-95 transition">
+            <i class="fa-solid fa-arrow-right-to-bracket mr-1"></i>参戦する
+          </button>
+        </div>
+
+        <!-- オフラインで始める (ソロ) -->
+        <div class="bg-gradient-to-br from-amber-950/60 to-orange-950/40 border border-amber-500/50 rounded-2xl p-3.5 flex flex-col justify-between hover:border-amber-400 transition shadow-lg">
+          <div>
+            <div class="flex items-center gap-2 text-amber-300 font-black text-sm mb-1">
+              <i class="fa-solid fa-gamepad text-amber-400"></i>オフライン出撃
+            </div>
+            <p class="text-[11px] text-slate-400 mb-3 leading-relaxed">
+              通信を行わず、ソロで即座に防衛戦を開始・特訓できます。
+            </p>
+          </div>
+          <button id="btnPlayOffline" class="w-full py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 font-black text-white text-xs rounded-xl shadow-lg shadow-amber-700/30 active:scale-95 transition">
+            <i class="fa-solid fa-play mr-1"></i>ソロで即開始
           </button>
         </div>
       </div>
@@ -579,55 +594,55 @@
 
     const sound = new SoundFX();
 
-    // --- 兵種マスターデータ (要求コイン数爆上げ対応) ---
+    // --- 兵種マスターデータ (要求コイン数爆上げ & ノックバック値再調整) ---
     const CLASS_DEFINITIONS = {
       barehand: {
         id: 'barehand', name: '素手兵', cost: 0,
         icon: 'fa-hand-back-fist', color: '#ec4899',
-        desc: '基本の平手打ち。隙が少なく扱いやすい基本兵。',
-        hp: 100, speed: 280, atk: 15, cd: 0.32, range: 65, type: 'melee', projSpeed: 0
+        desc: '基本の平手打ち。強烈な張り手で敵をしっかり弾き飛ばす！',
+        hp: 100, speed: 280, atk: 15, cd: 0.32, range: 65, type: 'melee', projSpeed: 0, kb: 160
       },
       knife: {
         id: 'knife', name: 'ナイフ兵', cost: 15000,
         icon: 'fa-utensils', color: '#f59e0b',
-        desc: 'リーチは短いが、驚異の超高速連撃を誇る近接暗殺兵。',
-        hp: 90, speed: 320, atk: 9, cd: 0.14, range: 48, type: 'melee', projSpeed: 0
+        desc: 'リーチは短いが驚異の超高速連撃。ノックバックは軽めで敵に肉薄。',
+        hp: 90, speed: 320, atk: 9, cd: 0.14, range: 48, type: 'melee', projSpeed: 0, kb: 60
       },
       spear: {
         id: 'spear', name: '槍兵', cost: 45000,
         icon: 'fa-wand-magic-sparkles', color: '#10b981',
-        desc: '長いリーチを活かして安全圏から精子を貫く突撃兵。',
-        hp: 110, speed: 270, atk: 22, cd: 0.45, range: 110, type: 'melee', projSpeed: 0
+        desc: '長いリーチの刺突。強烈な突き出しで敵を安全圏へ突き放す！',
+        hp: 110, speed: 270, atk: 22, cd: 0.45, range: 110, type: 'melee', projSpeed: 0, kb: 220
       },
       bomber: {
         id: 'bomber', name: '爆弾兵', cost: 120000,
         icon: 'fa-bomb', color: '#ef4444',
-        desc: 'CDは長めだが、広範囲に着弾爆破を起こすグレネード投擲兵。',
-        hp: 100, speed: 260, atk: 35, cd: 0.75, range: 250, type: 'projectile_aoe', projSpeed: 380
+        desc: '広範囲着弾爆破。凄まじい爆風衝撃波で大ノックバックを発生！',
+        hp: 100, speed: 260, atk: 35, cd: 0.75, range: 250, type: 'projectile_aoe', projSpeed: 380, kb: 360
       },
       handgun: {
         id: 'handgun', name: '拳銃兵', cost: 300000,
         icon: 'fa-gun', color: '#06b6d4',
-        desc: 'クリック連打で射撃レートが上がるセミオート銃士。',
-        hp: 95, speed: 290, atk: 14, cd: 0.22, range: 340, type: 'projectile', projSpeed: 520
+        desc: 'クリック連打セミオート。弾丸の阻止力で敵を適度に押し戻す。',
+        hp: 95, speed: 290, atk: 14, cd: 0.22, range: 340, type: 'projectile', projSpeed: 520, kb: 130
       },
       machinegun: {
         id: 'machinegun', name: '機銃兵', cost: 650000,
         icon: 'fa-crosshairs', color: '#8b5cf6',
-        desc: 'マウス長押しで弾幕を張り続けるフルオート掃射兵。',
-        hp: 105, speed: 250, atk: 7, cd: 0.10, range: 320, type: 'projectile', projSpeed: 480, auto: true
+        desc: '長押しフルオート掃射。1発ごとの押し戻しは軽いが連射で拘束。',
+        hp: 105, speed: 250, atk: 7, cd: 0.10, range: 320, type: 'projectile', projSpeed: 480, auto: true, kb: 50
       },
       mage: {
         id: 'mage', name: '魔法兵', cost: 1500000,
         icon: 'fa-hat-wizard', color: '#d946ef',
-        desc: '長押し連射＆左右2連ホーミング魔法弾で敵を自動追尾！',
-        hp: 95, speed: 270, atk: 13, cd: 0.22, range: 380, type: 'magic_homing_dual', projSpeed: 390, auto: true
+        desc: '長押し連射＆左右2連ホーミング魔法弾で追尾し中ノックバック。',
+        hp: 95, speed: 270, atk: 13, cd: 0.22, range: 380, type: 'magic_homing_dual', projSpeed: 390, auto: true, kb: 110
       },
       neet: {
         id: 'neet', name: '無職', cost: 9999999,
         icon: 'fa-couch', color: '#64748b',
         desc: '本当に何もしない。戦う気ゼロの超高級ネタ兵種。',
-        hp: 80, speed: 240, atk: 0, cd: 999, range: 0, type: 'none', projSpeed: 0
+        hp: 80, speed: 240, atk: 0, cd: 999, range: 0, type: 'none', projSpeed: 0, kb: 0
       }
     };
 
@@ -679,6 +694,7 @@
       // ネットワーク・ルーム
       mqttClient: null,
       isHost: false,
+      isOffline: false,
       roomCode: '',
       clientId: 'p_' + Math.random().toString(36).substring(2, 9),
       playerName: '防衛兵01',
@@ -708,7 +724,7 @@
       ovum: {
         x: 1300, y: 1000,
         radius: 75,
-        hp: 100, maxHp: 100,
+        barrierHp: 100, maxBarrierHp: 100, // 透明帯バリア膜
         turrets: 0
       },
 
@@ -722,6 +738,10 @@
       // 写真アサイン画像
       maleLionImg: null,
       femaleLionImg: null,
+      hasCustomMaleLion: false,
+      hasCustomFemaleLion: false,
+      hostMaleLionImg: null,
+      hostFemaleLionImg: null,
 
       // ホスト用ウェーブスポーン管理
       waveTotalEnemies: 0,
@@ -755,12 +775,14 @@
           const img = new Image();
           img.src = savedMalePhoto;
           state.maleLionImg = img;
+          state.hasCustomMaleLion = true;
         }
         const savedFemalePhoto = localStorage.getItem('sdf_female_lion_photo');
         if (savedFemalePhoto) {
           const img = new Image();
           img.src = savedFemalePhoto;
           state.femaleLionImg = img;
+          state.hasCustomFemaleLion = true;
         }
       } catch (e) {
         console.warn('Storage load failed:', e);
@@ -814,6 +836,60 @@
         ctx.fillText('🦁', x, y);
       }
       ctx.restore();
+    }
+
+    // 表示する写真の選定：自身の設定優先、未設定時はホスト画像、無ければフォールバック
+    function getActiveMaleLionImg() {
+      if (state.hasCustomMaleLion && state.maleLionImg) return state.maleLionImg;
+      if (state.hostMaleLionImg) return state.hostMaleLionImg;
+      return state.maleLionImg;
+    }
+
+    function getActiveFemaleLionImg() {
+      if (state.hasCustomFemaleLion && state.femaleLionImg) return state.femaleLionImg;
+      if (state.hostFemaleLionImg) return state.hostFemaleLionImg;
+      return state.femaleLionImg;
+    }
+
+    // ホスト写真の軽量データURL変換 (MQTT帯域保護用)
+    function compressImageThumbnail(img, size = 120) {
+      if (!img || !img.complete || img.naturalWidth === 0) return null;
+      try {
+        const cvs = document.createElement('canvas');
+        cvs.width = size;
+        cvs.height = size;
+        const c = cvs.getContext('2d');
+        const nw = img.naturalWidth, nh = img.naturalHeight;
+        const minS = Math.min(nw, nh);
+        c.drawImage(img, (nw - minS) / 2, (nh - minS) / 2, minS, minS, 0, 0, size, size);
+        return cvs.toDataURL('image/jpeg', 0.65);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function broadcastHostPhotos() {
+      if (!state.isHost || state.isOffline) return;
+      const maleData = compressImageThumbnail(state.maleLionImg);
+      const femaleData = compressImageThumbnail(state.femaleLionImg);
+      if (maleData || femaleData) {
+        sendPacket({
+          type: 'HOST_PHOTO_SYNC',
+          malePhoto: maleData,
+          femalePhoto: femaleData
+        });
+      }
+    }
+
+    // 敵へのノックバック付与関数
+    function applyKnockbackToEnemy(enemy, dirX, dirY, power) {
+      if (!power || power <= 0) return;
+      const bossResist = enemy.isBoss ? 0.20 : 1.0;
+      const dist = Math.hypot(dirX, dirY) || 1;
+      const nx = dirX / dist;
+      const ny = dirY / dist;
+      enemy.kbVx = (enemy.kbVx || 0) + nx * power * bossResist;
+      enemy.kbVy = (enemy.kbVy || 0) + ny * power * bossResist;
     }
 
     // --- MQTT.js ネットワーク通信基盤 ---
@@ -876,6 +952,7 @@
     }
 
     function sendPacket(data) {
+      if (state.isOffline) return;
       if (!state.mqttClient || !state.connected) return;
       data.senderId = state.clientId;
       data.time = Date.now();
@@ -891,7 +968,7 @@
           if (!state.players[msg.id]) {
             state.players[msg.id] = createNetworkPlayer(msg.id, msg.name, msg.classId, msg.isHost);
           }
-          // ホストの場合、現在のロビー全体リストやステータスを返信
+          // ホストの場合、ロビー情報と共に写真データも返信
           if (state.isHost) {
             sendPacket({
               type: 'LOBBY_SYNC_RESPONSE',
@@ -899,7 +976,9 @@
                 id: p.id, name: p.name, classId: p.classId, isHost: p.isHost
               })),
               gameStatus: state.gameStatus,
-              wave: state.wave
+              wave: state.wave,
+              malePhoto: compressImageThumbnail(state.maleLionImg),
+              femalePhoto: compressImageThumbnail(state.femaleLionImg)
             });
           }
           updateLobbyUI();
@@ -918,9 +997,36 @@
             });
             updateLobbyUI();
           }
-          // 途中参加フェイルセーフ
+          // ホストからの写真を自前未設定時のみ反映
+          if (!state.isHost) {
+            if (msg.malePhoto && !state.hasCustomMaleLion) {
+              const img = new Image();
+              img.src = msg.malePhoto;
+              state.hostMaleLionImg = img;
+            }
+            if (msg.femalePhoto && !state.hasCustomFemaleLion) {
+              const img = new Image();
+              img.src = msg.femalePhoto;
+              state.hostFemaleLionImg = img;
+            }
+          }
           if (msg.gameStatus === 'RUNNING' && state.gameStatus !== 'RUNNING') {
             triggerGameStart();
+          }
+          break;
+
+        case 'HOST_PHOTO_SYNC':
+          if (!state.isHost) {
+            if (msg.malePhoto && !state.hasCustomMaleLion) {
+              const img = new Image();
+              img.src = msg.malePhoto;
+              state.hostMaleLionImg = img;
+            }
+            if (msg.femalePhoto && !state.hasCustomFemaleLion) {
+              const img = new Image();
+              img.src = msg.femalePhoto;
+              state.hostFemaleLionImg = img;
+            }
           }
           break;
 
@@ -1133,6 +1239,8 @@
         speed: baseSpeed * (0.85 + Math.random() * 0.3),
         targetGoal,
         angle: 0,
+        kbVx: 0,
+        kbVy: 0,
         tailLength: 35 + Math.random() * 15,
         wiggleOffset: Math.random() * 10
       });
@@ -1142,7 +1250,7 @@
 
     // --- ホスト用：状態同期ブロードキャスト (約15Hz) ---
     function broadcastHostTick() {
-      if (!state.isHost) return;
+      if (!state.isHost || state.isOffline) return;
 
       const enemyData = state.enemies.map(e => ({
         id: e.id,
@@ -1158,7 +1266,7 @@
       sendPacket({
         type: 'HOST_TICK_UPDATE',
         wave: state.wave,
-        ovumHp: Math.round(state.ovum.hp),
+        ovumBarrierHp: Math.round(state.ovum.barrierHp),
         ovumTurrets: state.ovum.turrets,
         enemies: enemyData,
         remaining: state.waveRemainingEnemies
@@ -1168,11 +1276,10 @@
     // ゲスト用：ホストからのティック更新受信と補間
     function applyHostTickUpdate(data) {
       state.wave = data.wave;
-      state.ovum.hp = data.ovumHp;
+      state.ovum.barrierHp = (data.ovumBarrierHp !== undefined) ? data.ovumBarrierHp : (data.ovumHp || 0);
       state.ovum.turrets = data.ovumTurrets;
       state.waveRemainingEnemies = data.remaining;
 
-      // 既存の敵のターゲット座標を更新、または新規追加
       const newEnemies = [];
       data.enemies.forEach(item => {
         let existing = state.enemies.find(e => e.id === item.id);
@@ -1273,8 +1380,10 @@
             const e = state.enemies[j];
             const dist = Math.hypot(e.x - p.x, e.y - p.y);
             if (dist < e.radius + p.radius) {
-              // 着弾
+              // 着弾＆ノックバック適用
               e.hp -= p.damage;
+              applyKnockbackToEnemy(e, p.vx, p.vy, p.kb || 100);
+
               sendPacket({
                 type: 'ENEMY_HIT_EVENT',
                 x: e.x, y: e.y, damage: p.damage, color: p.color
@@ -1288,8 +1397,12 @@
                 createParticles(p.x, p.y, '#f97316', 18);
                 sound.play('explode');
                 state.enemies.forEach(otherE => {
-                  if (otherE !== e && Math.hypot(otherE.x - p.x, otherE.y - p.y) < 110) {
-                    otherE.hp -= p.damage * 0.7;
+                  if (otherE !== e) {
+                    const blastDist = Math.hypot(otherE.x - p.x, otherE.y - p.y);
+                    if (blastDist < 120) {
+                      otherE.hp -= p.damage * 0.7;
+                      applyKnockbackToEnemy(otherE, otherE.x - p.x, otherE.y - p.y, (p.kb || 200) * 0.85);
+                    }
                   }
                 });
               }
@@ -1385,7 +1498,6 @@
       if (cls.type === 'melee') {
         // 近接攻撃 (素手・ナイフ・槍)
         sound.play('hit');
-        // 近接扇形判定
         if (state.isHost) {
           state.enemies.forEach(e => {
             const dist = Math.hypot(e.x - p.x, e.y - p.y);
@@ -1395,6 +1507,8 @@
               while (diff > Math.PI) diff = Math.PI * 2 - diff;
               if (diff < 0.8) {
                 e.hp -= atkVal;
+                // 攻撃方向へノックバック
+                applyKnockbackToEnemy(e, Math.cos(p.angle), Math.sin(p.angle), cls.kb);
                 createParticles(e.x, e.y, cls.color, 5);
                 createFloatingText(e.x, e.y - 10, '-' + atkVal, '#f87171');
               }
@@ -1411,6 +1525,7 @@
           vy: Math.sin(p.angle) * cls.projSpeed,
           radius: cls.type === 'projectile_aoe' ? 7 : 4,
           damage: atkVal,
+          kb: cls.kb,
           color: cls.color,
           isAoe: cls.type === 'projectile_aoe',
           life: cls.range / cls.projSpeed
@@ -1430,6 +1545,7 @@
             vy: Math.sin(finalAngle) * cls.projSpeed,
             radius: 5,
             damage: atkVal,
+            kb: cls.kb,
             color: cls.color,
             isHoming: true,
             life: cls.range / cls.projSpeed
@@ -1477,7 +1593,6 @@
         let targetY = ovum.y;
 
         if (e.targetGoal === 'player' || (e.targetGoal === 'hybrid' && Math.random() < 0.05)) {
-          // 最寄りの生存プレイヤーを追跡
           let nearP = null, minD = 9999;
           Object.values(state.players).forEach(pl => {
             if (!pl.isDown) {
@@ -1498,16 +1613,46 @@
         e.angle = Math.atan2(dy, dx);
         e.wiggleOffset += dt * 14;
 
-        // 移動
-        e.x += (dx / dist) * e.speed * dt;
-        e.y += (dy / dist) * e.speed * dt;
+        // ノックバック物理減衰 (指数減衰) & 移動加算
+        e.kbVx = (e.kbVx || 0) * Math.exp(-dt * 9);
+        e.kbVy = (e.kbVy || 0) * Math.exp(-dt * 9);
+        e.x += (dx / dist) * e.speed * dt + e.kbVx * dt;
+        e.y += (dy / dist) * e.speed * dt + e.kbVy * dt;
 
-        // 卵子への到達判定 (即死・受精成立判定)
+        // 卵子・透明帯バリア膜との接触判定
         const distToOvum = Math.hypot(e.x - ovum.x, e.y - ovum.y);
-        if (distToOvum < ovum.radius + e.radius * 0.7) {
-          // 精子が受精卵に到達！！ ゲームオーバー
-          triggerGameOverAll();
-          return;
+        const membraneRadius = ovum.radius + 16;
+
+        if (distToOvum < membraneRadius + e.radius * 0.7) {
+          if (ovum.barrierHp > 0) {
+            // 膜が存在する場合: 膜が身代わりとなって精子を阻止・消滅！
+            const membraneDmg = e.isBoss ? 25 : 5;
+            ovum.barrierHp = Math.max(0, ovum.barrierHp - membraneDmg);
+            sound.play('hit');
+
+            createParticles(e.x, e.y, '#38bdf8', 10);
+            createFloatingText(e.x, e.y - 12, `膜 -${membraneDmg}`, '#38bdf8');
+
+            if (ovum.barrierHp <= 0) {
+              sound.play('explode');
+              createFloatingText(ovum.x, ovum.y - 30, '⚠️ 透明帯バリア崩壊!!', '#ef4444');
+            }
+
+            // ボスは膜で弾き返され、一般精子は膜に激突して消滅
+            if (e.isBoss) {
+              applyKnockbackToEnemy(e, e.x - ovum.x, e.y - ovum.y, 450);
+            } else {
+              state.enemies.splice(i, 1);
+              state.waveRemainingEnemies--;
+              continue;
+            }
+          } else {
+            // 膜が完全に壊れた状態で、中心核に接触したら受精成立 (ゲームオーバー)
+            if (distToOvum < ovum.radius * 0.85 + e.radius * 0.6) {
+              triggerGameOverAll();
+              return;
+            }
+          }
         }
 
         // プレイヤーへの接触攻撃判定
@@ -1675,22 +1820,46 @@
       const { ctx, ovum } = state;
 
       ctx.save();
-      // 外側パルスオーラ (透明帯バリア)
-      const pulse = Math.sin(performance.now() * 0.003) * 6;
-      ctx.beginPath();
-      ctx.arc(ovum.x, ovum.y, ovum.radius + 18 + pulse, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(244, 63, 94, 0.12)';
-      ctx.fill();
+      const hasBarrier = ovum.barrierHp > 0;
+      const barrierRatio = ovum.barrierHp / (ovum.maxBarrierHp || 100);
 
-      // 透明帯境界線
-      ctx.beginPath();
-      ctx.arc(ovum.x, ovum.y, ovum.radius + 10, 0, Math.PI * 2);
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = '#f43f5e';
-      ctx.stroke();
+      if (hasBarrier) {
+        // 透明帯外膜バリア (発光パルスシールド)
+        const pulse = Math.sin(performance.now() * 0.003) * 6;
+        const outerR = ovum.radius + 16 + pulse;
 
-      // 卵子本体核 (メスライオン写真円形描画)
-      drawCircleCroppedImage(ctx, state.femaleLionImg, ovum.x, ovum.y, ovum.radius, '#f43f5e');
+        ctx.beginPath();
+        ctx.arc(ovum.x, ovum.y, outerR, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(56, 189, 248, ${0.12 + barrierRatio * 0.16})`;
+        ctx.fill();
+
+        // 透明帯バリア境界線
+        ctx.beginPath();
+        ctx.arc(ovum.x, ovum.y, ovum.radius + 12, 0, Math.PI * 2);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = `rgba(56, 189, 248, ${0.45 + barrierRatio * 0.55})`;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(ovum.x, ovum.y, ovum.radius + 4, 0, Math.PI * 2);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = `rgba(244, 63, 94, ${0.4 * barrierRatio})`;
+        ctx.stroke();
+      } else {
+        // バリア破壊時：点滅する警告リング
+        const pulse = Math.sin(performance.now() * 0.008) * 4;
+        ctx.beginPath();
+        ctx.arc(ovum.x, ovum.y, ovum.radius + 8 + pulse, 0, Math.PI * 2);
+        ctx.strokeStyle = '#ef4444';
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([8, 6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // 卵子本体核 (優先写真適用)
+      const femaleImg = getActiveFemaleLionImg();
+      drawCircleCroppedImage(ctx, femaleImg, ovum.x, ovum.y, ovum.radius, '#f43f5e');
 
       // タレット増設描画
       if (ovum.turrets > 0) {
@@ -1712,6 +1881,8 @@
 
     function drawEnemies() {
       const { ctx } = state;
+      const maleImg = getActiveMaleLionImg();
+
       state.enemies.forEach(e => {
         ctx.save();
         ctx.translate(e.x, e.y);
@@ -1727,10 +1898,10 @@
         ctx.lineCap = 'round';
         ctx.stroke();
 
-        // 精子の頭部 (オスライオン写真円形描画)
-        drawCircleCroppedImage(ctx, state.maleLionImg, 0, 0, e.radius, e.isBoss ? '#dc2626' : '#f59e0b');
+        // 精子の頭部 (優先写真適用)
+        drawCircleCroppedImage(ctx, maleImg, 0, 0, e.radius, e.isBoss ? '#dc2626' : '#f59e0b');
 
-        // ボス用の威圧オーラ
+        // ボス用オーラ
         if (e.isBoss) {
           ctx.beginPath();
           ctx.arc(0, 0, e.radius + 6, 0, Math.PI * 2);
@@ -2000,11 +2171,13 @@
     function triggerGameOverAll() {
       state.gameStatus = 'GAMEOVER';
       sound.play('gameover');
-      sendPacket({
-        type: 'GAME_OVER_TRIGGER',
-        wave: state.wave,
-        coins: state.matchCoins
-      });
+      if (!state.isOffline) {
+        sendPacket({
+          type: 'GAME_OVER_TRIGGER',
+          wave: state.wave,
+          coins: state.matchCoins
+        });
+      }
       handleGameOver(state.wave, state.matchCoins);
     }
 
@@ -2021,7 +2194,7 @@
       if (canvas) {
         const ctx = canvas.getContext('2d');
         ctx.clearRect(0, 0, 96, 96);
-        drawCircleCroppedImage(ctx, state.maleLionImg, 48, 48, 46, '#ef4444');
+        drawCircleCroppedImage(ctx, getActiveMaleLionImg(), 48, 48, 46, '#ef4444');
       }
     }
 
@@ -2238,8 +2411,8 @@
 
     function applyGlobalShopItem(id) {
       if (id === 'global_repair') {
-        state.ovum.hp = Math.min(100, state.ovum.hp + 25);
-        createFloatingText(state.ovum.x, state.ovum.y - 30, '透明帯+25%修復!', '#ec4899');
+        state.ovum.barrierHp = Math.min(100, (state.ovum.barrierHp || 0) + 35);
+        createFloatingText(state.ovum.x, state.ovum.y - 30, '透明帯バリア+35%修復!', '#38bdf8');
       } else if (id === 'global_turret') {
         state.ovum.turrets++;
         createFloatingText(state.ovum.x, state.ovum.y - 30, '迎撃タレット増設!', '#8b5cf6');
@@ -2254,9 +2427,25 @@
 
     // --- DOM要素のイベントバインド ---
     function setupDOMEvents() {
+      // オフラインで始める (ソロ)
+      const btnOffline = document.getElementById('btnPlayOffline');
+      if (btnOffline) {
+        btnOffline.onclick = () => {
+          sound.init();
+          state.isOffline = true;
+          state.isHost = true;
+          state.roomCode = 'SOLO';
+          updateNetStatus('オフライン出撃モード (ソロ)', 'green');
+          state.players = {};
+          state.players[state.clientId] = createNetworkPlayer(state.clientId, state.playerName, state.selectedClassId, true);
+          startCountdownAnimation();
+        };
+      }
+
       // 部屋を立てる
       document.getElementById('btnCreateRoom').onclick = () => {
         sound.init();
+        state.isOffline = false;
         const code = 'SDF' + Math.floor(10 + Math.random() * 90);
         state.isHost = true;
         initMQTT(code, () => {
@@ -2265,12 +2454,14 @@
           document.getElementById('lobbyRoomCode').innerText = state.roomCode;
           state.players[state.clientId] = createNetworkPlayer(state.clientId, state.playerName, state.selectedClassId, true);
           updateLobbyUI();
+          broadcastHostPhotos();
         });
       };
 
       // 部屋に参加する
       document.getElementById('btnJoinRoom').onclick = () => {
         sound.init();
+        state.isOffline = false;
         const code = document.getElementById('inputRoomCode').value.trim();
         if (!code) {
           alertBox('ルームコードを入力してください！');
@@ -2351,11 +2542,15 @@
           const reader = new FileReader();
           reader.onload = (evt) => {
             const img = new Image();
+            img.onload = () => {
+              state.maleLionImg = img;
+              state.hasCustomMaleLion = true;
+              try { localStorage.setItem('sdf_male_lion_photo', evt.target.result); } catch (err) {}
+              const p = document.getElementById('previewMaleLion');
+              if (p) p.innerHTML = `<img src="${evt.target.result}" class="w-full h-full object-cover">`;
+              if (state.isHost) broadcastHostPhotos();
+            };
             img.src = evt.target.result;
-            state.maleLionImg = img;
-            try { localStorage.setItem('sdf_male_lion_photo', evt.target.result); } catch (err) {}
-            const p = document.getElementById('previewMaleLion');
-            if (p) p.innerHTML = `<img src="${evt.target.result}" class="w-full h-full object-cover">`;
           };
           reader.readAsDataURL(file);
         }
@@ -2368,11 +2563,15 @@
           const reader = new FileReader();
           reader.onload = (evt) => {
             const img = new Image();
+            img.onload = () => {
+              state.femaleLionImg = img;
+              state.hasCustomFemaleLion = true;
+              try { localStorage.setItem('sdf_female_lion_photo', evt.target.result); } catch (err) {}
+              const p = document.getElementById('previewFemaleLion');
+              if (p) p.innerHTML = `<img src="${evt.target.result}" class="w-full h-full object-cover">`;
+              if (state.isHost) broadcastHostPhotos();
+            };
             img.src = evt.target.result;
-            state.femaleLionImg = img;
-            try { localStorage.setItem('sdf_female_lion_photo', evt.target.result); } catch (err) {}
-            const p = document.getElementById('previewFemaleLion');
-            if (p) p.innerHTML = `<img src="${evt.target.result}" class="w-full h-full object-cover">`;
           };
           reader.readAsDataURL(file);
         }
@@ -2519,8 +2718,15 @@
       const titleCoin = document.getElementById('titleCoinCount');
       const downBanner = document.getElementById('downBanner');
 
-      if (hudOvumText) hudOvumText.innerText = Math.round(state.ovum.hp) + '%';
-      if (hudOvumBar) hudOvumBar.style.width = Math.max(0, state.ovum.hp) + '%';
+      if (hudOvumText) hudOvumText.innerText = Math.round(state.ovum.barrierHp) + '%';
+      if (hudOvumBar) {
+        hudOvumBar.style.width = Math.max(0, state.ovum.barrierHp) + '%';
+        if (state.ovum.barrierHp > 30) {
+          hudOvumBar.className = 'h-full bg-gradient-to-r from-pink-500 via-rose-400 to-cyan-400 transition-all duration-200';
+        } else {
+          hudOvumBar.className = 'h-full bg-gradient-to-r from-red-600 to-rose-500 animate-pulse transition-all duration-200';
+        }
+      }
       if (hudWave) hudWave.innerText = state.wave;
       if (hudEnemyCount) hudEnemyCount.innerText = state.waveRemainingEnemies;
       if (hudCoin) hudCoin.innerText = state.coins.toLocaleString();
