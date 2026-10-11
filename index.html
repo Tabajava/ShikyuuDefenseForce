@@ -8,293 +8,206 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- MQTT.js (HiveMQ WebSocket 透過) -->
   <script src="https://unpkg.com/mqtt@5.3.5/dist/mqtt.min.js"></script>
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@700;800;900&display=swap');
-    * {
-      box-sizing: border-box;
-      user-select: none;
-      -webkit-user-select: none;
-      touch-action: none;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&display=swap');
     body {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background-color: #0b0f19;
-      font-family: 'M PLUS Rounded 1c', 'Mochiy Pop One', sans-serif;
+      margin: 0; padding: 0; overflow: hidden;
+      user-select: none; -webkit-user-select: none; touch-action: none;
+      background-color: #0b0f19; font-family: 'Mochiy Pop One', sans-serif, system-ui;
     }
-    canvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-    }
-    .custom-scroll::-webkit-scrollbar {
-      width: 5px;
-    }
-    .custom-scroll::-webkit-scrollbar-track {
-      background: rgba(15, 23, 42, 0.6);
-      border-radius: 4px;
-    }
-    .custom-scroll::-webkit-scrollbar-thumb {
-      background: #f43f5e;
-      border-radius: 4px;
-    }
-    .comic-shadow {
-      box-shadow: 4px 4px 0px #000000;
-    }
-    .comic-btn:active {
-      transform: translate(2px, 2px);
-      box-shadow: 2px 2px 0px #000000;
-    }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    .custom-scroll::-webkit-scrollbar { width: 5px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #f43f5e; border-radius: 3px; }
+    .comic-shadow { box-shadow: 4px 4px 0px #000000; }
+    .comic-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0px #000000; }
   </style>
 </head>
-<body class="relative w-screen h-screen text-white">
+<body class="relative w-screen h-screen">
 
-  <!-- メインCanvas -->
+  <!-- ゲームキャンバス -->
   <canvas id="gameCanvas"></canvas>
 
-  <!-- トースト通知コンテナ (alert代替) -->
-  <div id="toastContainer" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center space-y-2 pointer-events-none"></div>
+  <!-- 上部トースト通知 -->
+  <div id="toastContainer" class="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center space-y-2"></div>
 
-  <!-- 上部ステータスバー (ゲーム中表示) -->
+  <!-- HUD上部バー (ゲームプレイ中常時表示) -->
   <div id="hudTop" class="hidden absolute top-3 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
-    <!-- ウェーブ & 透明帯防護膜情報 -->
-    <div class="flex items-center space-x-3 pointer-events-auto bg-slate-900/90 backdrop-blur border-2 border-rose-500 rounded-2xl px-3.5 py-2 comic-shadow">
+    <div class="flex items-center space-x-3 pointer-events-auto bg-slate-900/90 border-2 border-rose-500 rounded-2xl px-4 py-2 comic-shadow">
       <div>
-        <div class="text-[10px] text-rose-300 font-bold uppercase tracking-wider">作戦ウェーブ</div>
-        <div id="hudWaveNum" class="text-xl sm:text-2xl text-yellow-400 font-black leading-none">WAVE 1</div>
+        <div class="text-[10px] text-rose-300 font-bold">作戦ウェーブ</div>
+        <div id="hudWaveNum" class="text-2xl text-yellow-400 font-black leading-none">WAVE 1</div>
       </div>
       <div class="h-8 w-[2px] bg-slate-700"></div>
       <div>
         <div class="flex justify-between text-xs font-bold mb-1">
-          <span class="text-pink-300 flex items-center gap-1"><i class="fa-solid fa-shield-halved"></i> 透明帯バリア</span>
+          <span class="text-pink-300">透明帯バリア膜</span>
           <span id="hudBarrierHpTxt" class="text-white ml-2">100/100</span>
         </div>
-        <div class="w-28 sm:w-44 h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-          <div id="hudBarrierHpBar" class="h-full bg-gradient-to-r from-pink-500 to-rose-400 transition-all duration-200 w-full"></div>
+        <div class="w-32 sm:w-44 h-3 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+          <div id="hudBarrierHpBar" class="h-full bg-gradient-to-r from-pink-500 to-rose-400 w-full transition-all duration-150"></div>
         </div>
       </div>
     </div>
 
-    <!-- 所持コイン & 音声切り替え -->
+    <!-- コイン & サウンド設定 -->
     <div class="flex items-center space-x-2 pointer-events-auto">
-      <div class="flex items-center space-x-2 bg-slate-900/90 border-2 border-amber-400 rounded-2xl px-3.5 py-2 comic-shadow">
-        <i class="fa-solid fa-coins text-yellow-400 text-base"></i>
-        <span id="hudCoins" class="text-yellow-400 text-base sm:text-lg font-black tracking-wide">0</span>
+      <div class="flex items-center space-x-2 bg-slate-900/90 border-2 border-amber-400 rounded-2xl px-3 py-2 comic-shadow">
+        <span class="text-xl">🪙</span>
+        <span id="hudCoins" class="text-yellow-400 text-lg font-black tracking-wide">0</span>
       </div>
-      <button id="btnSoundToggle" class="bg-slate-900/90 border-2 border-slate-700 rounded-2xl p-2.5 text-white hover:border-slate-400 transition comic-shadow">
-        <i id="soundIcon" class="fa-solid fa-volume-high text-lg"></i>
+      <button id="btnSoundToggle" class="bg-slate-900/90 border-2 border-slate-700 rounded-2xl p-2.5 text-white comic-shadow hover:border-slate-500 transition">
+        <span id="soundIcon" class="text-lg">🔊</span>
       </button>
     </div>
   </div>
 
-  <!-- プレイヤー自機HP HUD (画面左下) -->
+  <!-- 自機HP HUD (画面左下) -->
   <div id="hudPlayerHp" class="hidden absolute bottom-4 left-4 pointer-events-none z-10">
-    <div class="bg-slate-900/90 backdrop-blur border-2 border-emerald-500 rounded-2xl p-3 comic-shadow pointer-events-auto">
+    <div class="bg-slate-900/90 border-2 border-emerald-500 rounded-2xl p-3 comic-shadow pointer-events-auto">
       <div class="flex justify-between items-center text-xs font-bold text-emerald-300 mb-1">
         <span id="hudPlayerName">自機隊員</span>
         <span id="hudPlayerHpTxt">100 / 100</span>
       </div>
-      <div class="w-36 sm:w-48 h-3.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
-        <div id="hudPlayerHpBar" class="h-full bg-emerald-500 transition-all duration-150 w-full"></div>
+      <div class="w-40 sm:w-52 h-3.5 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+        <div id="hudPlayerHpBar" class="h-full bg-emerald-500 w-full transition-all duration-150"></div>
       </div>
     </div>
   </div>
 
   <!-- タイトル画面 -->
-  <div id="screenTitle" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-4 z-30 overflow-y-auto">
-    <div class="max-w-md w-full text-center space-y-5 my-auto">
+  <div id="screenTitle" class="absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-4 z-30">
+    <div class="max-w-md w-full text-center space-y-6">
       <div>
-        <div class="inline-block bg-rose-600 text-white text-xs px-3 py-1 rounded-full uppercase tracking-widest font-black mb-2 comic-shadow">
+        <div class="inline-block bg-rose-600 text-white text-[11px] px-3 py-1 rounded-full uppercase tracking-widest font-black mb-2 comic-shadow">
           SDF : SHIKYUU DEFENSE FORCE
         </div>
-        <h1 class="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-pink-300 to-amber-300 tracking-wider filter drop-shadow">
+        <h1 class="text-4xl sm:text-5xl font-black text-rose-400 tracking-wider">
           子宮防衛軍
         </h1>
-        <p class="text-xs sm:text-sm text-slate-400 mt-2 font-bold">迫り来る数億の精子から受精卵を死守せよ！</p>
+        <p class="text-xs text-slate-400 mt-2">数億の精子から受精卵（メスライオン）を守り抜け！</p>
       </div>
 
-      <div class="bg-slate-900/90 border-2 border-slate-800 rounded-3xl p-5 comic-shadow space-y-4 text-left">
-        <!-- プレイヤー名 -->
+      <div class="bg-slate-900 border-2 border-slate-800 rounded-3xl p-5 comic-shadow space-y-4">
         <div>
-          <label class="block text-xs font-bold text-slate-400 mb-1">
-            <i class="fa-solid fa-user-shield text-rose-400 mr-1"></i>隊員コールサイン
-          </label>
-          <input id="inputPlayerName" type="text" maxlength="10" value="防衛兵01" class="w-full bg-slate-800 border-2 border-slate-700 rounded-xl px-4 py-2.5 text-white font-bold text-sm focus:border-rose-500 focus:outline-none">
+          <label class="block text-xs font-bold text-slate-400 mb-1 text-left">隊員ネーム</label>
+          <input id="inputPlayerName" type="text" maxlength="10" value="防衛隊員01" class="w-full bg-slate-800 border-2 border-slate-700 rounded-xl px-4 py-2 text-white font-bold text-sm focus:outline-none focus:border-rose-500">
         </div>
 
-        <!-- 部屋作成 / 参加 -->
-        <div class="grid grid-cols-2 gap-3 pt-1">
-          <button id="btnCreateRoom" class="comic-btn bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-black py-3 rounded-2xl border-2 border-rose-400 comic-shadow text-xs sm:text-sm text-center">
-            <i class="fa-solid fa-tower-broadcast mr-1"></i>部屋を立てる
+        <div class="grid grid-cols-2 gap-3">
+          <button id="btnCreateRoom" class="comic-btn bg-rose-600 hover:bg-rose-500 text-white font-black py-3 rounded-2xl border-2 border-rose-400 comic-shadow text-sm">
+            🏠 部屋を立てる
           </button>
-          <button id="btnOpenJoin" class="comic-btn bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white font-black py-3 rounded-2xl border-2 border-indigo-400 comic-shadow text-xs sm:text-sm text-center">
-            <i class="fa-solid fa-right-to-bracket mr-1"></i>部屋に参加
+          <button id="btnOpenJoin" class="comic-btn bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3 rounded-2xl border-2 border-indigo-400 comic-shadow text-sm">
+            🚪 部屋に参加
           </button>
         </div>
-
-        <!-- ソロ出撃 -->
-        <button id="btnSoloPlay" class="w-full comic-btn bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black py-3 rounded-2xl border-2 border-emerald-400 comic-shadow text-sm text-center">
-          <i class="fa-solid fa-gamepad mr-1"></i>オフライン出撃 (ソロ)
+        <button id="btnSoloPlay" class="w-full comic-btn bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-2xl border-2 border-emerald-400 comic-shadow text-sm">
+          ⚔️ オフライン出撃 (ソロ)
         </button>
 
-        <div class="flex justify-center space-x-4 pt-2 text-xs">
-          <button id="btnOpenBarracks" class="text-yellow-400 hover:text-yellow-300 underline font-bold flex items-center gap-1">
-            <i class="fa-solid fa-shield-halved"></i>兵舎・バッジガチャ
-          </button>
+        <div class="flex justify-center space-x-4 pt-2">
+          <button id="btnOpenBarracks" class="text-xs text-yellow-400 hover:underline font-bold">🎖️ 兵舎・バッジガチャ</button>
           <span class="text-slate-600">|</span>
-          <button id="btnOpenPhotoSetting" class="text-rose-400 hover:text-rose-300 underline font-bold flex items-center gap-1">
-            <i class="fa-solid fa-camera"></i>ライオン写真設定
-          </button>
+          <button id="btnOpenPhotoSetting" class="text-xs text-rose-400 hover:underline font-bold">🦁 写真設定 (ライオン)</button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 待機ロビー画面 -->
-  <div id="screenLobby" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur flex flex-col items-center justify-center p-4 z-30 overflow-y-auto">
-    <div class="max-w-lg w-full bg-slate-900 border-2 border-rose-500 rounded-3xl p-6 comic-shadow space-y-4 my-auto">
-      
-      <!-- 通信状態インジケーター -->
-      <div class="flex justify-between items-center text-xs px-1">
-        <span id="lobbyNetStatus" class="font-bold flex items-center gap-1.5 text-amber-400">
-          <span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
-          <span>ブローカー接続中...</span>
-        </span>
-        <span class="text-slate-400 font-mono text-[11px]" id="lobbyPingTxt">HiveMQ MQTT</span>
-      </div>
-
-      <div class="text-center">
-        <div class="text-xs font-bold text-slate-400 uppercase tracking-widest">作戦ルームコード</div>
-        <div class="text-3xl sm:text-4xl font-black text-rose-400 font-mono tracking-widest bg-slate-800/80 px-6 py-1.5 rounded-2xl border border-slate-700 inline-block my-2" id="lobbyRoomCode">
-          ------
-        </div>
-        <!-- コピーボタン -->
-        <div class="flex items-center justify-center gap-2.5 mt-1">
-          <button id="btnCopyRoomCode" class="comic-btn bg-indigo-600 hover:bg-indigo-500 border border-indigo-400 text-xs font-black text-white px-3.5 py-1.5 rounded-xl flex items-center gap-1.5">
-            <i class="fa-solid fa-copy"></i>コードをコピー
-          </button>
-          <button id="btnCopyInviteUrl" class="comic-btn bg-emerald-600 hover:bg-emerald-500 border border-emerald-400 text-xs font-black text-white px-3.5 py-1.5 rounded-xl flex items-center gap-1.5">
-            <i class="fa-solid fa-link"></i>招待URLをコピー
-          </button>
-        </div>
-      </div>
-
-      <!-- メンバー一覧 -->
-      <div>
-        <div class="flex justify-between items-center text-xs font-bold text-slate-400 mb-2">
-          <span><i class="fa-solid fa-users mr-1 text-pink-400"></i>配属隊員一覧</span>
-          <span id="lobbyMemberCount">1 / 8</span>
-        </div>
-        <div id="lobbyMemberList" class="space-y-1.5 max-h-48 overflow-y-auto custom-scroll pr-1"></div>
-      </div>
-
-      <!-- 出撃操作 -->
-      <div class="space-y-2 pt-2 border-t border-slate-800">
-        <button id="btnHostStart" class="hidden w-full comic-btn bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 text-white font-black py-3 rounded-2xl border-2 border-rose-400 comic-shadow text-base">
-          <i class="fa-solid fa-play mr-2"></i>作戦開始
-        </button>
-        <div id="guestWaitingNotice" class="text-center text-xs sm:text-sm font-bold text-amber-300 py-2.5 flex items-center justify-center gap-2">
-          <i class="fa-solid fa-spinner fa-spin text-pink-400"></i>ホストの作戦開始を待機中...
-        </div>
-        <button id="btnLeaveLobby" class="w-full py-1.5 text-xs text-slate-400 hover:text-white font-bold transition">
-          ロビーから抜ける
-        </button>
       </div>
     </div>
   </div>
 
   <!-- 部屋参加モーダル -->
-  <div id="modalJoin" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur flex items-center justify-center p-4 z-40">
+  <div id="modalJoin" class="hidden absolute inset-0 bg-slate-950/80 flex items-center justify-center p-4 z-40">
     <div class="max-w-xs w-full bg-slate-900 border-2 border-indigo-500 rounded-3xl p-5 comic-shadow text-center space-y-4">
       <h3 class="text-lg font-black text-indigo-300">防衛ルームに参加</h3>
       <input id="inputJoinCode" type="text" placeholder="6桁コード" maxlength="6" class="w-full uppercase text-center bg-slate-800 border-2 border-indigo-400 rounded-xl py-2.5 text-white font-mono text-xl tracking-widest focus:outline-none">
       <div class="flex space-x-2">
-        <button id="btnCancelJoin" class="w-1/2 py-2.5 bg-slate-800 text-slate-300 rounded-xl font-bold text-xs">戻る</button>
-        <button id="btnConfirmJoin" class="w-1/2 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-black text-xs">参戦</button>
+        <button id="btnCancelJoin" class="w-1/2 py-2 bg-slate-800 text-slate-300 rounded-xl font-bold text-sm">戻る</button>
+        <button id="btnConfirmJoin" class="w-1/2 py-2 bg-indigo-600 text-white rounded-xl font-black text-sm">参加する</button>
       </div>
     </div>
   </div>
 
-  <!-- ウェーブ後：前線補給基地 (16アイテム & 全員準備完了同期) -->
-  <div id="modalWaveShop" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 z-40 overflow-y-auto">
-    <div class="max-w-4xl w-full bg-slate-900 border-2 border-amber-500 rounded-3xl p-4 sm:p-6 comic-shadow space-y-3.5 my-auto">
-      
-      <!-- ショップ上部バー -->
-      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2.5">
-        <div>
-          <div class="inline-block bg-amber-500/20 text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-500/30 uppercase">
-            Wave Clear Supply
-          </div>
-          <h2 class="text-lg sm:text-xl font-black text-amber-400 flex items-center gap-2">
-            <i class="fa-solid fa-cart-shopping"></i>前線補給基地
-          </h2>
+  <!-- 待機ロビー画面 -->
+  <div id="screenLobby" class="hidden absolute inset-0 bg-slate-950/90 flex flex-col items-center justify-center p-4 z-30">
+    <div class="max-w-md w-full bg-slate-900 border-2 border-rose-500 rounded-3xl p-6 comic-shadow space-y-5">
+      <div class="text-center">
+        <div class="text-xs font-bold text-slate-400">作戦ルームコード</div>
+        <div class="flex items-center justify-center space-x-2 mt-1">
+          <span id="lobbyRoomCode" class="text-3xl font-black text-rose-400 font-mono tracking-widest bg-slate-800 px-4 py-1.5 rounded-2xl border border-slate-700">------</span>
         </div>
-        <div class="flex items-center gap-1.5 bg-amber-950/60 border border-amber-500/50 px-3.5 py-1.5 rounded-2xl">
-          <i class="fa-solid fa-coins text-yellow-400 text-sm"></i>
-          <span id="shopCoins" class="text-yellow-300 font-black text-sm sm:text-base">0</span>
+        <div class="flex justify-center space-x-2 mt-2">
+          <button id="btnCopyCode" class="comic-btn bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs text-white px-3 py-1.5 rounded-xl">📋 コードコピー</button>
+          <button id="btnCopyUrl" class="comic-btn bg-slate-800 hover:bg-slate-700 border border-slate-600 text-xs text-white px-3 py-1.5 rounded-xl">🔗 招待URLコピー</button>
         </div>
       </div>
 
-      <!-- 16種類のアイテムグリッド (個人10種 + 全体拠点6種) -->
-      <div id="shopItemGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 max-h-[55vh] overflow-y-auto custom-scroll pr-1"></div>
-
-      <!-- 全員準備完了 同期フッター -->
-      <div class="pt-2.5 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-2.5">
-        <div class="flex items-center gap-2">
-          <div class="text-xs font-bold text-slate-300">
-            隊員の準備状況:
-            <span id="shopReadyCount" class="text-emerald-400 font-black text-base ml-1">0</span>
-            /
-            <span id="shopTotalCount" class="text-white font-black text-base">1</span> 人
-          </div>
-          <span class="text-[11px] text-amber-400 font-bold hidden sm:inline">
-            ※全員が「準備完了」を押すと次ウェーブへ出撃します！
-          </span>
+      <div>
+        <div class="flex justify-between items-center text-xs font-bold text-slate-400 mb-2">
+          <span>待機中の防衛隊員</span>
+          <span id="lobbyMemberCount">1 / 8</span>
         </div>
+        <div id="lobbyMemberList" class="space-y-2 max-h-48 overflow-y-auto custom-scroll pr-1"></div>
+      </div>
 
-        <button id="btnShopReadyToggle" class="w-full sm:w-auto comic-btn px-7 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs sm:text-sm rounded-2xl border-2 border-emerald-400 flex items-center justify-center gap-1.5">
-          <i class="fa-solid fa-circle-check"></i>
-          <span id="btnShopReadyTxt">準備完了 (次へ進む)</span>
+      <div class="space-y-2 pt-2">
+        <button id="btnHostStart" class="hidden w-full comic-btn bg-rose-600 hover:bg-rose-500 text-white font-black py-3.5 rounded-2xl border-2 border-rose-400 comic-shadow text-base">
+          作戦開始
+        </button>
+        <div id="guestWaitingNotice" class="text-center text-sm font-bold text-slate-400 py-3 animate-pulse">
+          ホストの作戦開始を待機中...
+        </div>
+        <button id="btnLeaveLobby" class="w-full py-2 text-xs text-slate-400 hover:text-white font-bold">
+          ロビーから退出
         </button>
       </div>
     </div>
   </div>
 
-  <!-- 3-2-1 カウントダウンオーバーレイ -->
-  <div id="overlayCountdown" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-md flex flex-col items-center justify-center z-50 pointer-events-none select-none">
-    <div id="txtCountdown" class="text-8xl sm:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 via-pink-400 to-rose-500 drop-shadow-2xl animate-bounce">
-      3
-    </div>
-    <div class="text-sm font-black text-pink-300 tracking-widest mt-4 uppercase">
-      防衛網展開まで...
+  <!-- 3-2-1 カウントダウン -->
+  <div id="overlayCountdown" class="hidden absolute inset-0 bg-slate-950/70 flex items-center justify-center z-50 pointer-events-none">
+    <div id="txtCountdown" class="text-8xl sm:text-9xl font-black text-yellow-400 animate-bounce">3</div>
+  </div>
+
+  <!-- 前線補給基地 (16種ショップ & 全員準備同期) -->
+  <div id="modalWaveShop" class="hidden absolute inset-0 bg-slate-950/85 flex items-center justify-center p-3 z-40">
+    <div class="max-w-2xl w-full bg-slate-900 border-2 border-amber-500 rounded-3xl p-5 comic-shadow space-y-3 max-h-[90vh] flex flex-col">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+        <div>
+          <h2 class="text-lg sm:text-xl font-black text-amber-400">🛒 前線補給基地 (16種フルラインナップ)</h2>
+          <p class="text-xs text-slate-400">部隊全員が「準備完了」を押すと次ウェーブへ出撃します</p>
+        </div>
+        <div class="flex items-center space-x-1.5 bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700">
+          <span>🪙</span>
+          <span id="shopCoins" class="text-yellow-400 font-black text-sm">0</span>
+        </div>
+      </div>
+      <div id="shopItemList" class="grid grid-cols-1 sm:grid-cols-2 gap-2 overflow-y-auto custom-scroll pr-1 flex-1"></div>
+      <div class="pt-3 border-t border-slate-800 flex justify-between items-center">
+        <div class="text-xs font-bold text-slate-300">隊員の準備状況: <span id="shopReadyCount" class="text-amber-400 text-sm font-black">0 / 1</span></div>
+        <button id="btnReadyShop" class="comic-btn bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs px-5 py-2.5 rounded-xl border border-emerald-400">
+          準備完了 (次へ進む)
+        </button>
+      </div>
     </div>
   </div>
 
   <!-- 兵舎・バッジガチャ モーダル -->
-  <div id="modalBarracks" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-40 overflow-y-auto">
-    <div class="max-w-2xl w-full bg-slate-900 border-2 border-slate-700 rounded-3xl p-5 comic-shadow space-y-4 my-auto">
+  <div id="modalBarracks" class="hidden absolute inset-0 bg-slate-950/90 flex items-center justify-center p-4 z-40">
+    <div class="max-w-xl w-full bg-slate-900 border-2 border-slate-700 rounded-3xl p-5 comic-shadow space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-        <h2 class="text-lg font-black text-yellow-400 flex items-center gap-2">
-          <i class="fa-solid fa-person-military-rifle"></i>兵舎・兵種解放 & バッジガチャ
-        </h2>
+        <h2 class="text-xl font-black text-yellow-400">🎖️ 兵舎・兵種解放 & ガチャ</h2>
         <button id="btnCloseBarracks" class="text-slate-400 hover:text-white text-xl font-black px-2">✕</button>
       </div>
-
       <div>
-        <div class="text-xs font-bold text-slate-400 mb-2">配備可能な兵種</div>
-        <div id="barracksCharGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
+        <div class="text-xs font-bold text-slate-400 mb-2">配備可能な兵種 (全8種)</div>
+        <div id="barracksCharGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5"></div>
       </div>
-
-      <div class="bg-slate-800/80 rounded-2xl p-3.5 border border-slate-700 space-y-2.5">
-        <div class="flex flex-wrap justify-between items-center gap-2">
+      <div class="bg-slate-800 rounded-2xl p-4 border border-slate-700 space-y-3">
+        <div class="flex justify-between items-center">
           <div class="text-xs font-bold text-slate-300">
             <span id="selectedCharName" class="text-rose-400 text-sm font-black">素手兵</span> の装備バッジ (3枠)
           </div>
           <button id="btnRollBadge" class="comic-btn bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 text-slate-950 font-black text-xs px-3.5 py-1.5 rounded-xl border border-yellow-300">
-            <i class="fa-solid fa-dice mr-1"></i>3枠一括ガチャ (50🪙)
+            🎲 バッジガチャ (50🪙)
           </button>
         </div>
         <div id="badgeSlotList" class="grid grid-cols-3 gap-2"></div>
@@ -302,497 +215,168 @@
     </div>
   </div>
 
-  <!-- 写真設定 モーダル -->
-  <div id="modalPhotos" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-40 overflow-y-auto">
-    <div class="max-w-md w-full bg-slate-900 border-2 border-rose-600 rounded-3xl p-5 comic-shadow space-y-4 my-auto">
+  <!-- 写真設定モーダル -->
+  <div id="modalPhotos" class="hidden absolute inset-0 bg-slate-950/90 flex items-center justify-center p-4 z-40">
+    <div class="max-w-md w-full bg-slate-900 border-2 border-rose-600 rounded-3xl p-5 comic-shadow space-y-4">
       <div class="flex justify-between items-center border-b border-slate-800 pb-2">
-        <h2 class="text-lg font-black text-rose-400 flex items-center gap-2">
-          <i class="fa-solid fa-camera-retro"></i>ライオン写真アサイン
-        </h2>
+        <h2 class="text-lg font-black text-rose-400">🦁 ライオン写真アサイン</h2>
         <button id="btnClosePhotos" class="text-slate-400 hover:text-white text-xl font-black px-2">✕</button>
       </div>
       <p class="text-xs text-slate-400 leading-relaxed">
-        写真は自動で中央正方形が検出され、綺麗な円形にクロップされます。
+        写真は自動的に丸型スタンプに事前キャッシュされ、常時60FPSで爆速描画されます。
       </p>
-
       <div class="grid grid-cols-2 gap-4">
         <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 text-center space-y-2">
-          <div class="text-xs font-bold text-amber-300">精子の頭 (雄ライオン)</div>
-          <div class="w-16 h-16 mx-auto rounded-full overflow-hidden border-2 border-amber-400 bg-slate-900 flex items-center justify-center text-2xl">
-            <img id="previewMale" class="w-full h-full object-cover hidden">
-            <span id="fallbackMale">🦁</span>
-          </div>
-          <label class="block cursor-pointer bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-1.5 rounded-xl transition">
-            画像選択
-            <input id="inputMaleImg" type="file" accept="image/*" class="hidden">
+          <div class="text-xs font-bold text-slate-300">精子の頭 (オスライオン)</div>
+          <canvas id="thumbCanvasMale" width="80" height="80" class="mx-auto rounded-full border-2 border-yellow-400 bg-slate-900"></canvas>
+          <label class="block cursor-pointer bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-1.5 rounded-xl">
+            画像選択<input id="inputMaleImg" type="file" accept="image/*" class="hidden">
           </label>
         </div>
-
         <div class="bg-slate-800 p-3 rounded-2xl border border-slate-700 text-center space-y-2">
-          <div class="text-xs font-bold text-pink-300">卵子の核 (雌ライオン)</div>
-          <div class="w-16 h-16 mx-auto rounded-full overflow-hidden border-2 border-pink-400 bg-slate-900 flex items-center justify-center text-2xl">
-            <img id="previewFemale" class="w-full h-full object-cover hidden">
-            <span id="fallbackFemale">👑</span>
-          </div>
-          <label class="block cursor-pointer bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-1.5 rounded-xl transition">
-            画像選択
-            <input id="inputFemaleImg" type="file" accept="image/*" class="hidden">
+          <div class="text-xs font-bold text-slate-300">卵子の核 (メスライオン)</div>
+          <canvas id="thumbCanvasFemale" width="80" height="80" class="mx-auto rounded-full border-2 border-pink-400 bg-slate-900"></canvas>
+          <label class="block cursor-pointer bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold py-1.5 rounded-xl">
+            画像選択<input id="inputFemaleImg" type="file" accept="image/*" class="hidden">
           </label>
         </div>
       </div>
-
-      <div class="pt-2 text-right">
-        <button id="btnSavePhotos" class="comic-btn bg-rose-600 hover:bg-rose-500 text-white text-xs font-black px-5 py-2 rounded-xl border border-rose-400">
-          完了
-        </button>
+      <div class="text-right">
+        <button id="btnSavePhotos" class="comic-btn bg-rose-600 text-white text-xs font-black px-6 py-2 rounded-xl">保存・完了</button>
       </div>
     </div>
   </div>
 
-  <!-- 受精成立 (ゲームオーバー) 画面 -->
-  <div id="screenGameOver" class="hidden absolute inset-0 bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-4 z-40 select-none">
-    <div class="max-w-md w-full text-center space-y-5">
-      <div class="w-20 h-20 mx-auto rounded-full border-4 border-rose-500 overflow-hidden shadow-2xl relative">
-        <canvas id="lionGameOverCanvas" width="80" height="80" class="w-full h-full"></canvas>
+  <!-- ゲームオーバー画面 -->
+  <div id="screenGameOver" class="hidden absolute inset-0 bg-rose-950/95 flex flex-col items-center justify-center p-4 z-40">
+    <div class="max-w-md w-full text-center space-y-5 animate-pulse">
+      <div class="text-6xl">🎉 👶 💖</div>
+      <h2 class="text-3xl font-black text-rose-300">生命の神秘、大勝利！</h2>
+      <p class="text-sm text-yellow-300 font-bold">（子宮防衛軍は完全に敗北しました）</p>
+      <div class="bg-slate-900 border-2 border-rose-500 rounded-3xl p-4 text-xs text-slate-300 space-y-2 text-left">
+        <div class="flex justify-between"><span>到達ウェーブ:</span><span id="goWaveText" class="font-bold text-yellow-400">WAVE 1</span></div>
+        <div class="flex justify-between"><span>獲得コイン合計:</span><span id="goCoinsText" class="font-bold text-yellow-400">0 🪙</span></div>
       </div>
-      <h2 class="text-3xl font-black text-rose-300 filter drop-shadow">
-        生命の神秘、大勝利！
-      </h2>
-      <p class="text-sm text-yellow-300 font-bold">
-        【受精が成立しました（防衛軍任務失敗）】
-      </p>
-      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 text-xs text-slate-300 space-y-2 text-left">
-        <div class="flex justify-between">
-          <span class="text-slate-400">防衛到達ウェーブ:</span>
-          <span id="goWaveText" class="font-bold text-yellow-400">WAVE 1</span>
-        </div>
-        <div class="flex justify-between">
-          <span class="text-slate-400">総獲得コイン:</span>
-          <span id="goCoinsText" class="font-bold text-yellow-400">0 🪙</span>
-        </div>
-      </div>
-      <button id="btnRestartFromOver" class="w-full comic-btn bg-gradient-to-r from-rose-600 to-pink-600 text-white font-black py-3 rounded-2xl border-2 border-rose-400 text-sm">
-        司令部（タイトル）へ帰還
-      </button>
+      <button id="btnRestartFromOver" class="w-full comic-btn bg-rose-600 text-white font-black py-3 rounded-2xl text-sm">作戦室へ帰還</button>
     </div>
   </div>
 
   <script>
     /* =====================================================================
-       子宮防衛軍 (Shikyuu Defense Force - SDF) - 統合スクリプト
+       子宮防衛軍 (Shikyuu Defense Force - SDF) 完全復元版
        ===================================================================== */
 
-    // --- Web Audio API 合成音源エンジン ---
+    function showToast(msg, bg = 'bg-rose-600') {
+      const c = document.getElementById('toastContainer');
+      const el = document.createElement('div');
+      el.className = `${bg} text-white text-xs font-black px-4 py-2 rounded-2xl comic-shadow transition-all duration-200 opacity-0 -translate-y-2`;
+      el.innerText = msg;
+      c.appendChild(el);
+      requestAnimationFrame(() => { el.classList.remove('opacity-0', '-translate-y-2'); });
+      setTimeout(() => {
+        el.classList.add('opacity-0', '-translate-y-2');
+        setTimeout(() => el.remove(), 250);
+      }, 2200);
+    }
+
+    // --- オーディオシンセ ---
     const AudioEngine = {
-      ctx: null,
-      enabled: true,
+      ctx: null, enabled: true,
       init() {
         if (!this.ctx) {
-          const AudioContext = window.AudioContext || window.webkitAudioContext;
-          if (AudioContext) this.ctx = new AudioContext();
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (AC) this.ctx = new AC();
         }
-        if (this.ctx && this.ctx.state === 'suspended') {
-          this.ctx.resume();
-        }
+        if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
       },
-      play(type) {
+      play(t) {
         if (!this.enabled) return;
         this.init();
         if (!this.ctx) return;
         const now = this.ctx.currentTime;
         const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
+        const g = this.ctx.createGain();
+        osc.connect(g); g.connect(this.ctx.destination);
 
-        switch (type) {
-          case 'punch':
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(140, now);
-            osc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
-            osc.start(now); osc.stop(now + 0.1);
-            break;
-          case 'gun':
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(450, now);
-            osc.frequency.exponentialRampToValueAtTime(80, now + 0.07);
-            gain.gain.setValueAtTime(0.15, now);
-            gain.gain.linearRampToValueAtTime(0.01, now + 0.07);
-            osc.start(now); osc.stop(now + 0.07);
-            break;
-          case 'magic':
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(400, now);
-            osc.frequency.exponentialRampToValueAtTime(850, now + 0.12);
-            gain.gain.setValueAtTime(0.15, now);
-            gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
-            osc.start(now); osc.stop(now + 0.12);
-            break;
-          case 'bomb':
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(100, now);
-            osc.frequency.exponentialRampToValueAtTime(20, now + 0.3);
-            gain.gain.setValueAtTime(0.3, now);
-            gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
-            osc.start(now); osc.stop(now + 0.3);
-            break;
-          case 'bite':
-            osc.type = 'sawtooth';
-            osc.frequency.setValueAtTime(220, now);
-            osc.frequency.exponentialRampToValueAtTime(60, now + 0.12);
-            gain.gain.setValueAtTime(0.25, now);
-            gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
-            osc.start(now); osc.stop(now + 0.12);
-            break;
-          case 'coin':
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(987, now);
-            osc.frequency.setValueAtTime(1318, now + 0.07);
-            gain.gain.setValueAtTime(0.12, now);
-            gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
-            osc.start(now); osc.stop(now + 0.2);
-            break;
-          case 'revive':
-            [523.25, 659.25, 783.99, 1046.50].forEach((f, idx) => {
-              const o = this.ctx.createOscillator();
-              const g = this.ctx.createGain();
-              o.connect(g);
-              g.connect(this.ctx.destination);
-              o.frequency.setValueAtTime(f, now + idx * 0.06);
-              g.gain.setValueAtTime(0.18, now + idx * 0.06);
-              g.gain.linearRampToValueAtTime(0.01, now + idx * 0.06 + 0.14);
-              o.start(now + idx * 0.06);
-              o.stop(now + idx * 0.06 + 0.15);
-            });
-            break;
-          case 'countdown_tick':
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(600, now);
-            gain.gain.setValueAtTime(0.15, now);
-            gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
-            osc.start(now); osc.stop(now + 0.08);
-            break;
-          case 'countdown_start':
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(1200, now);
-            gain.gain.setValueAtTime(0.25, now);
-            gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
-            osc.start(now); osc.stop(now + 0.35);
-            break;
-          case 'gameover':
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(300, now);
-            osc.frequency.linearRampToValueAtTime(140, now + 0.5);
-            gain.gain.setValueAtTime(0.25, now);
-            gain.gain.linearRampToValueAtTime(0.01, now + 0.6);
-            osc.start(now); osc.stop(now + 0.6);
-            break;
+        if (t === 'punch') {
+          osc.type = 'triangle'; osc.frequency.setValueAtTime(140, now); osc.frequency.exponentialRampToValueAtTime(30, now + 0.1);
+          g.gain.setValueAtTime(0.2, now); g.gain.linearRampToValueAtTime(0.01, now + 0.1);
+          osc.start(now); osc.stop(now + 0.1);
+        } else if (t === 'gun') {
+          osc.type = 'square'; osc.frequency.setValueAtTime(450, now); osc.frequency.exponentialRampToValueAtTime(80, now + 0.06);
+          g.gain.setValueAtTime(0.15, now); g.gain.linearRampToValueAtTime(0.01, now + 0.06);
+          osc.start(now); osc.stop(now + 0.06);
+        } else if (t === 'magic') {
+          osc.type = 'sine'; osc.frequency.setValueAtTime(400, now); osc.frequency.exponentialRampToValueAtTime(800, now + 0.12);
+          g.gain.setValueAtTime(0.15, now); g.gain.linearRampToValueAtTime(0.01, now + 0.12);
+          osc.start(now); osc.stop(now + 0.12);
+        } else if (t === 'bomb') {
+          osc.type = 'sawtooth'; osc.frequency.setValueAtTime(100, now); osc.frequency.exponentialRampToValueAtTime(20, now + 0.3);
+          g.gain.setValueAtTime(0.35, now); g.gain.linearRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now); osc.stop(now + 0.3);
+        } else if (t === 'bite') {
+          osc.type = 'sawtooth'; osc.frequency.setValueAtTime(220, now); osc.frequency.exponentialRampToValueAtTime(60, now + 0.1);
+          g.gain.setValueAtTime(0.25, now); g.gain.linearRampToValueAtTime(0.01, now + 0.1);
+          osc.start(now); osc.stop(now + 0.1);
+        } else if (t === 'coin') {
+          osc.type = 'sine'; osc.frequency.setValueAtTime(987, now); osc.frequency.setValueAtTime(1318, now + 0.07);
+          g.gain.setValueAtTime(0.12, now); g.gain.linearRampToValueAtTime(0.01, now + 0.18);
+          osc.start(now); osc.stop(now + 0.18);
+        } else if (t === 'fanfare') {
+          osc.type = 'triangle'; osc.frequency.setValueAtTime(523, now); osc.frequency.setValueAtTime(659, now + 0.08); osc.frequency.setValueAtTime(783, now + 0.16); osc.frequency.setValueAtTime(1046, now + 0.24);
+          g.gain.setValueAtTime(0.2, now); g.gain.linearRampToValueAtTime(0.01, now + 0.5);
+          osc.start(now); osc.stop(now + 0.5);
+        } else if (t === 'tick') {
+          osc.type = 'sine'; osc.frequency.setValueAtTime(600, now);
+          g.gain.setValueAtTime(0.15, now); g.gain.linearRampToValueAtTime(0.01, now + 0.08);
+          osc.start(now); osc.stop(now + 0.08);
+        } else if (t === 'go') {
+          osc.type = 'sine'; osc.frequency.setValueAtTime(1200, now);
+          g.gain.setValueAtTime(0.25, now); g.gain.linearRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now); osc.stop(now + 0.3);
         }
       }
     };
 
-    // --- 自作トースト通知関数 (alert完全排除) ---
-    function showToast(msg, type = 'info') {
-      const container = document.getElementById('toastContainer');
-      if (!container) return;
-      const toast = document.createElement('div');
-      const colors = {
-        info: 'bg-slate-900 border-indigo-500 text-indigo-300',
-        success: 'bg-slate-900 border-emerald-500 text-emerald-300',
-        warn: 'bg-slate-900 border-amber-500 text-amber-300',
-        error: 'bg-slate-900 border-rose-500 text-rose-300'
-      };
-      toast.className = `px-3.5 py-2 rounded-2xl border-2 ${colors[type] || colors.info} font-black text-xs comic-shadow flex items-center gap-2 transform transition-all duration-200 opacity-0 translate-y-2 pointer-events-auto`;
-      toast.innerHTML = `<i class="fa-solid fa-circle-info"></i><span>${msg}</span>`;
-      container.appendChild(toast);
-
-      requestAnimationFrame(() => {
-        toast.classList.remove('opacity-0', 'translate-y-2');
-      });
-
-      setTimeout(() => {
-        toast.classList.add('opacity-0', '-translate-y-2');
-        setTimeout(() => toast.remove(), 250);
-      }, 2000);
-    }
-
-    // --- 兵種定義 (8種) ---
+    // --- 8兵種定義 ---
     const CHARACTERS = [
-      { id: 'fist', name: '素手兵', cost: 0, desc: '両手ビンタで確実に弾き飛ばす！', cd: 0.35, range: 75, dmg: 22, kb: 160, speed: 250, auto: false },
-      { id: 'knife', name: 'ナイフ兵', cost: 15000, desc: 'リーチは短いが超高速の連撃！', cd: 0.14, range: 55, dmg: 14, kb: 60, speed: 280, auto: false },
-      { id: 'spear', name: '槍兵', cost: 45000, desc: '前方に長射程の刺突！', cd: 0.45, range: 145, dmg: 38, kb: 220, speed: 240, auto: false },
-      { id: 'bomb', name: '爆弾兵', cost: 120000, desc: '広域爆風グレネードで一掃！', cd: 0.85, range: 240, dmg: 65, kb: 360, speed: 230, auto: false, isBomb: true },
-      { id: 'pistol', name: '拳銃兵', cost: 300000, desc: '連打するほど高レートな銃撃！', cd: 0.22, range: 380, dmg: 26, kb: 130, speed: 250, auto: false, isBullet: true },
-      { id: 'machinegun', name: '機銃兵', cost: 650000, desc: '長押し連射対応の弾幕射撃！', cd: 0.10, range: 340, dmg: 11, kb: 50, speed: 235, auto: true, isBullet: true },
-      { id: 'mage', name: '魔法兵', cost: 1500000, desc: '左右2連発の追従ホーミング弾！', cd: 0.25, range: 440, dmg: 24, kb: 110, speed: 245, auto: true, isMagic: true },
-      { id: 'neet', name: '無職', cost: 9999999, desc: '本当に何もできない。逃げ惑うのみ。', cd: 99, range: 0, dmg: 0, kb: 0, speed: 270, auto: false }
+      { id: 'fist', name: '素手兵', cost: 0, desc: 'ビンタで確実に殴り倒す！', cd: 0.35, range: 75, dmg: 22, kb: 160, speed: 250, auto: false },
+      { id: 'knife', name: 'ナイフ兵', cost: 15000, desc: '超高速連撃アサシン！', cd: 0.14, range: 55, dmg: 14, kb: 60, speed: 280, auto: false },
+      { id: 'spear', name: '槍兵', cost: 45000, desc: '長射程刺突！安全圏から串刺し！', cd: 0.45, range: 145, dmg: 38, kb: 220, speed: 240, auto: false },
+      { id: 'bomb', name: '爆弾兵', cost: 120000, desc: '広域グレネード爆弾！', cd: 0.85, range: 240, dmg: 65, kb: 360, speed: 230, auto: false, isBomb: true },
+      { id: 'pistol', name: '拳銃兵', cost: 300000, desc: '連打するほど高レートな拳銃！', cd: 0.22, range: 380, dmg: 26, kb: 130, speed: 250, auto: false, isBullet: true },
+      { id: 'machinegun', name: '機銃兵', cost: 650000, desc: '長押し連射マシンガン！', cd: 0.10, range: 340, dmg: 11, kb: 50, speed: 235, auto: true, isBullet: true },
+      { id: 'mage', name: '魔法兵', cost: 1500000, desc: '左右2連ホーミング弾！長押し対応！', cd: 0.25, range: 440, dmg: 24, kb: 110, speed: 245, auto: true, isMagic: true },
+      { id: 'neet', name: '無職', cost: 9999999, desc: '何もできないネタキャラ。', cd: 99, range: 0, dmg: 0, kb: 0, speed: 270, auto: false }
     ];
 
-    // --- 16種類のショップアイテム定義 (個人10種 + 全体6種) ---
+    // --- 16種類のショップ要素 ---
     const SHOP_ITEMS_16 = [
-      { id: 'p_heal', name: '救急ナノ細胞', cat: 'personal', cost: 15, icon: 'fa-kit-medical', color: 'text-emerald-400', desc: '自機HPを即座に+60回復する。' },
-      { id: 'p_maxhp', name: '筋肥大プロテイン', cat: 'personal', cost: 25, icon: 'fa-heart', color: 'text-rose-400', desc: '最大HP+25アップ＆HP全快。' },
-      { id: 'p_atk', name: 'ドーピング注射', cat: 'personal', cost: 30, icon: 'fa-dumbbell', color: 'text-red-400', desc: '自機の攻撃力恒久+18%。' },
-      { id: 'p_spd', name: '鞭毛ブースター', cat: 'personal', cost: 20, icon: 'fa-person-running', color: 'text-cyan-400', desc: '自機の移動速度恒久+12%。' },
-      { id: 'p_cd', name: 'シナプス加速器', cat: 'personal', cost: 35, icon: 'fa-bolt', color: 'text-yellow-400', desc: '攻撃クールダウン-12%短縮。' },
-      { id: 'p_range', name: '拡大照準レンズ', cat: 'personal', cost: 25, icon: 'fa-bullseye', color: 'text-indigo-400', desc: '射程及び弾速+20%延長。' },
-      { id: 'p_kb', name: '衝撃波増幅器', cat: 'personal', cost: 25, icon: 'fa-hand-back-fist', color: 'text-orange-400', desc: '敵へのノックバック力+35%。' },
-      { id: 'p_luck', name: '白血球の招き猫', cat: 'personal', cost: 30, icon: 'fa-clover', color: 'text-amber-400', desc: '精子撃破コイン獲得+25%。' },
-      { id: 'p_regen', name: '自己修復遺伝子', cat: 'personal', cost: 40, icon: 'fa-wand-magic-sparkles', color: 'text-purple-400', desc: '毎秒自機HPが+2ずつ自然回復。' },
-      { id: 'p_crit', name: '急所穿孔ドリル', cat: 'personal', cost: 45, icon: 'fa-crosshairs', color: 'text-pink-400', desc: 'クリティカル率+15% (威力2倍)。' },
-      { id: 'g_repair', name: '透明帯ポリマー修復', cat: 'global', cost: 35, icon: 'fa-shield-heart', color: 'text-pink-400', desc: '【部隊全体】バリア膜を+35%修復。' },
-      { id: 'g_maxbarrier', name: '透明帯外殻硬質化', cat: 'global', cost: 50, icon: 'fa-cubes', color: 'text-sky-400', desc: '【部隊全体】バリア最大値+30 & 全快。' },
-      { id: 'g_turret', name: '迎撃自律タレット', cat: 'global', cost: 65, icon: 'fa-satellite-dish', color: 'text-teal-400', desc: '【部隊全体】卵子周囲に防衛砲台+1台。' },
-      { id: 'g_turret_boost', name: 'タレット過給機', cat: 'global', cost: 45, icon: 'fa-gauge-high', color: 'text-emerald-400', desc: '【部隊全体】全タレットの射撃間隔-30%。' },
-      { id: 'g_acid_zone', name: '強酸性バッファー網', cat: 'global', cost: 55, icon: 'fa-flask', color: 'text-lime-400', desc: '【部隊全体】卵子至近の敵速度-35%低下。' },
-      { id: 'g_rally_cry', name: '全軍防衛フェロモン', cat: 'global', cost: 50, icon: 'fa-bullhorn', color: 'text-yellow-400', desc: '【部隊全体】隊員全員の攻撃+12%・速度+8%。' }
+      { id: 'heal_self', name: '救急ナノ細胞', cost: 15, desc: '自機HPを+60回復', type: 'self' },
+      { id: 'max_hp_up', name: '筋肥大プロテイン', cost: 30, desc: '自機最大HP+25＆全快', type: 'self' },
+      { id: 'atk_up', name: 'ドーピング注射', cost: 40, desc: '自機攻撃威力 +18%', type: 'self' },
+      { id: 'spd_up', name: '鞭毛ブースター', cost: 25, desc: '自機移動速度 +12%', type: 'self' },
+      { id: 'cd_down', name: 'シナプス加速器', cost: 35, desc: '攻撃クールダウン -12%', type: 'self' },
+      { id: 'range_up', name: '拡大照準レンズ', cost: 25, desc: '射程＆弾速 +20%', type: 'self' },
+      { id: 'kb_up', name: '衝撃波増幅器', cost: 20, desc: 'ノックバック +35%', type: 'self' },
+      { id: 'coin_up', name: '白血球の招き猫', cost: 30, desc: 'コイン獲得 +25%', type: 'self' },
+      { id: 'regen', name: '自己修復遺伝子', cost: 50, desc: '毎秒HP+2自然回復', type: 'self' },
+      { id: 'crit', name: '急所穿孔ドリル', cost: 45, desc: '15%で2倍クリティカル', type: 'self' },
+      { id: 'repair_barrier', name: '透明帯ポリマー修復', cost: 35, desc: 'バリア膜+35修復（全員共有）', type: 'global' },
+      { id: 'barrier_max_up', name: '透明帯外殻硬質化', cost: 60, desc: 'バリア最大+30＆全快（全員共有）', type: 'global' },
+      { id: 'turret', name: '迎撃自律タレット', cost: 70, desc: '自動砲台を1基増設（全員共有）', type: 'global' },
+      { id: 'turret_speed', name: 'タレット過給機', cost: 50, desc: 'タレット連射+30%（全員共有）', type: 'global' },
+      { id: 'acid_field', name: '強酸性バッファー網', cost: 55, desc: '卵子周辺の敵-35%減速（全員共有）', type: 'global' },
+      { id: 'team_buff', name: '全軍防衛フェロモン', cost: 80, desc: '部隊全員の攻撃+12%・速度+8%（全員共有）', type: 'global' }
     ];
 
-    // --- ワールド論理座標空間 ---
-    const WORLD = {
-      width: 2600,
-      height: 2000,
-      ovumX: 1300,
-      ovumY: 1000,
-      ovumRadius: 90,
-      barrierRadius: 135
-    };
-
-    // --- ゲーム全体状態管理 ---
-    const state = {
-      mqttClient: null,
-      mqttConnected: false,
-      roomCode: '',
-      isHost: false,
-      isOffline: false,
-      myId: 'p_' + Math.random().toString(36).substring(2, 7),
-      myName: '防衛兵01',
-      status: 'TITLE',
-      wave: 1,
-      coins: parseInt(localStorage.getItem('sdf_coins') || '0', 10),
-      unlockedChars: JSON.parse(localStorage.getItem('sdf_unlocked') || '["fist"]'),
-      charBadges: JSON.parse(localStorage.getItem('sdf_badges') || '{}'),
-      selectedChar: 'fist',
-
-      localX: WORLD.ovumX,
-      localY: WORLD.ovumY - 140,
-      localAimAngle: 0,
-      isMouseDown: false,
-      lastAttackTime: 0,
-      localReviveProgress: 0,
-
-      playerBuffs: { atk: 1, spd: 1, cd: 1, rng: 1, kb: 1, luck: 1, regen: 0, crit: 0 },
-      teamBuffs: { atk: 1, spd: 1, acidZone: false, turretRate: 1 },
-
-      players: [],
-      readyPlayerIds: new Set(),
-      isMyReady: false,
-
-      enemies: [],
-      projectiles: [],
-      particles: [],
-      floatingTexts: [],
-      turrets: [],
-
-      barrierHp: 100,
-      maxBarrierHp: 100,
-      camera: { x: WORLD.ovumX, y: WORLD.ovumY },
-
-      imgMale: null,
-      imgFemale: null
-    };
-
-    function saveStorage() {
-      try {
-        localStorage.setItem('sdf_coins', state.coins.toString());
-        localStorage.setItem('sdf_unlocked', JSON.stringify(state.unlockedChars));
-        localStorage.setItem('sdf_badges', JSON.stringify(state.charBadges));
-      } catch (e) {}
-    }
-
-    function drawCircleCroppedImage(ctx, img, cx, cy, radius, fallbackColor = '#f59e0b', fallbackEmoji = '🦁') {
-      if (img && img.complete && img.naturalWidth > 0) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.clip();
-        const nw = img.naturalWidth;
-        const nh = img.naturalHeight;
-        const size = Math.min(nw, nh);
-        const sx = (nw - size) / 2;
-        const sy = (nh - size) / 2;
-        ctx.drawImage(img, sx, sy, size, size, cx - radius, cy - radius, radius * 2, radius * 2);
-        ctx.restore();
-        return true;
-      } else {
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-        ctx.fillStyle = fallbackColor;
-        ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-
-        ctx.font = `${Math.floor(radius * 1.1)}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(fallbackEmoji, cx, cy + 1);
-        return false;
-      }
-    }
-
-    function initPhotoSystem() {
-      const maleData = localStorage.getItem('sdf_photo_male');
-      if (maleData) {
-        state.imgMale = new Image();
-        state.imgMale.src = maleData;
-        const prev = document.getElementById('previewMale');
-        if (prev) { prev.src = maleData; prev.classList.remove('hidden'); }
-        document.getElementById('fallbackMale')?.classList.add('hidden');
-      }
-      const femaleData = localStorage.getItem('sdf_photo_female');
-      if (femaleData) {
-        state.imgFemale = new Image();
-        state.imgFemale.src = femaleData;
-        const prev = document.getElementById('previewFemale');
-        if (prev) { prev.src = femaleData; prev.classList.remove('hidden'); }
-        document.getElementById('fallbackFemale')?.classList.add('hidden');
-      }
-
-      document.getElementById('inputMaleImg').onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          try { localStorage.setItem('sdf_photo_male', evt.target.result); } catch (err) {}
-          state.imgMale = new Image();
-          state.imgMale.src = evt.target.result;
-          const prev = document.getElementById('previewMale');
-          if (prev) { prev.src = evt.target.result; prev.classList.remove('hidden'); }
-          document.getElementById('fallbackMale')?.classList.add('hidden');
-        };
-        reader.readAsDataURL(file);
-      };
-
-      document.getElementById('inputFemaleImg').onchange = (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          try { localStorage.setItem('sdf_photo_female', evt.target.result); } catch (err) {}
-          state.imgFemale = new Image();
-          state.imgFemale.src = evt.target.result;
-          const prev = document.getElementById('previewFemale');
-          if (prev) { prev.src = evt.target.result; prev.classList.remove('hidden'); }
-          document.getElementById('fallbackFemale')?.classList.add('hidden');
-        };
-        reader.readAsDataURL(file);
-      };
-    }
-
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d', { alpha: false }); // alpha無効で描画パフォーマンス向上
-
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    function screenToWorld(sx, sy) {
-      return {
-        x: sx + (state.camera.x - canvas.width / 2),
-        y: sy + (state.camera.y - canvas.height / 2)
-      };
-    }
-
-    const inputState = {
-      up: false, down: false, left: false, right: false,
-      touchActive: false, touchStartX: 0, touchStartY: 0, touchCurX: 0, touchCurY: 0
-    };
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key === 'w' || e.key === 'ArrowUp') inputState.up = true;
-      if (e.key === 's' || e.key === 'ArrowDown') inputState.down = true;
-      if (e.key === 'a' || e.key === 'ArrowLeft') inputState.left = true;
-      if (e.key === 'd' || e.key === 'ArrowRight') inputState.right = true;
-    });
-
-    window.addEventListener('keyup', (e) => {
-      if (e.key === 'w' || e.key === 'ArrowUp') inputState.up = false;
-      if (e.key === 's' || e.key === 'ArrowDown') inputState.down = false;
-      if (e.key === 'a' || e.key === 'ArrowLeft') inputState.left = false;
-      if (e.key === 'd' || e.key === 'ArrowRight') inputState.right = false;
-    });
-
-    window.addEventListener('mousemove', (e) => {
-      const wPos = screenToWorld(e.clientX, e.clientY);
-      state.localAimAngle = Math.atan2(wPos.y - state.localY, wPos.x - state.localX);
-    });
-
-    window.addEventListener('mousedown', (e) => {
-      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('#hudTop') || e.target.closest('#modalWaveShop') || e.target.closest('#screenTitle')) return;
-      state.isMouseDown = true;
-      AudioEngine.init();
-      const wPos = screenToWorld(e.clientX, e.clientY);
-      state.localAimAngle = Math.atan2(wPos.y - state.localY, wPos.x - state.localX);
-      tryAttack();
-    });
-
-    window.addEventListener('mouseup', () => { state.isMouseDown = false; });
-
-    canvas.addEventListener('touchstart', (e) => {
-      AudioEngine.init();
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const t = e.changedTouches[i];
-        if (t.clientX < window.innerWidth * 0.45) {
-          inputState.touchActive = true;
-          inputState.touchStartX = t.clientX;
-          inputState.touchStartY = t.clientY;
-          inputState.touchCurX = t.clientX;
-          inputState.touchCurY = t.clientY;
-        } else {
-          state.isMouseDown = true;
-          const wPos = screenToWorld(t.clientX, t.clientY);
-          state.localAimAngle = Math.atan2(wPos.y - state.localY, wPos.x - state.localX);
-          tryAttack();
-        }
-      }
-    }, { passive: false });
-
-    canvas.addEventListener('touchmove', (e) => {
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const t = e.changedTouches[i];
-        if (inputState.touchActive && t.clientX < window.innerWidth * 0.5) {
-          inputState.touchCurX = t.clientX;
-          inputState.touchCurY = t.clientY;
-        } else {
-          const wPos = screenToWorld(t.clientX, t.clientY);
-          state.localAimAngle = Math.atan2(wPos.y - state.localY, wPos.x - state.localX);
-        }
-      }
-    }, { passive: false });
-
-    canvas.addEventListener('touchend', (e) => {
-      for (let i = 0; i < e.changedTouches.length; i++) {
-        const t = e.changedTouches[i];
-        if (t.clientX < window.innerWidth * 0.5) {
-          inputState.touchActive = false;
-        } else {
-          state.isMouseDown = false;
-        }
-      }
-    });
-
+    // --- バッジ定義 ---
     const BADGE_TYPES = [
-      { id: 'spd', name: '敏捷の心得', vals: [8, 16, 25] },
-      { id: 'atk', name: '筋力覚醒', vals: [10, 20, 35] },
-      { id: 'rng', name: '拡大スコープ', vals: [12, 24, 40] },
-      { id: 'kb', name: '重力掌打', vals: [15, 30, 50] },
-      { id: 'luck', name: '幸運の招き猫', vals: [10, 20, 35] }
+      { id: 'spd', name: '敏捷の心得', desc: '移動速度 +{v}%', vals: [8, 16, 25] },
+      { id: 'atk', name: '筋力覚醒', desc: '攻撃威力 +{v}%', vals: [10, 20, 35] },
+      { id: 'rng', name: '拡大スコープ', desc: '射程・弾速 +{v}%', vals: [12, 24, 40] },
+      { id: 'kb', name: '重力掌打', desc: 'ノックバック +{v}%', vals: [15, 30, 50] },
+      { id: 'coin', name: '幸運の招き猫', desc: 'コイン獲得 +{v}%', vals: [10, 20, 35] }
     ];
     const RARITY = [
       { name: 'Common', color: 'text-slate-300', border: 'border-slate-600' },
@@ -800,1434 +384,979 @@
       { name: 'Super Rare', color: 'text-amber-400', border: 'border-amber-400' }
     ];
 
-    function rollBadgesForChar(charId) {
-      if (state.coins < 50) {
-        showToast('コインが足りません！ (必要: 50コイン)', 'warn');
-        return;
-      }
-      state.coins -= 50;
-      saveStorage();
-      updateHudCoins();
+    const WORLD = { width: 2600, height: 2000, ovumX: 1300, ovumY: 1000, ovumRadius: 85, barrierRadius: 130 };
 
-      const newBadges = [];
-      for (let i = 0; i < 3; i++) {
-        const bType = BADGE_TYPES[Math.floor(Math.random() * BADGE_TYPES.length)];
-        const rIndex = Math.random() < 0.6 ? 0 : (Math.random() < 0.88 ? 1 : 2);
-        newBadges.push({
-          typeId: bType.id,
-          name: bType.name,
-          rIndex: rIndex,
-          value: bType.vals[rIndex]
-        });
+    // --- オフスクリーン・スタンプ事前キャッシュ (高速化の鍵) ---
+    const ImageStamp = {
+      maleStamp: null,
+      femaleStamp: null,
+      createCircularStamp(imgSrc, size, fallbackEmoji, bgFill) {
+        const c = document.createElement('canvas');
+        c.width = size; c.height = size;
+        const cx = c.getContext('2d');
+        const r = size / 2;
+
+        if (imgSrc) {
+          const img = new Image();
+          img.onload = () => {
+            cx.clearRect(0, 0, size, size);
+            cx.save();
+            cx.beginPath();
+            cx.arc(r, r, r - 2, 0, Math.PI * 2);
+            cx.clip();
+            const minS = Math.min(img.naturalWidth, img.naturalHeight);
+            cx.drawImage(img, (img.naturalWidth - minS) / 2, (img.naturalHeight - minS) / 2, minS, minS, 0, 0, size, size);
+            cx.restore();
+            cx.beginPath();
+            cx.arc(r, r, r - 2, 0, Math.PI * 2);
+            cx.strokeStyle = bgFill; cx.lineWidth = 3; cx.stroke();
+          };
+          img.src = imgSrc;
+        } else {
+          cx.beginPath();
+          cx.arc(r, r, r - 2, 0, Math.PI * 2);
+          cx.fillStyle = bgFill; cx.fill();
+          cx.font = `${Math.floor(size * 0.55)}px sans-serif`;
+          cx.textAlign = 'center'; cx.textBaseline = 'middle';
+          cx.fillText(fallbackEmoji, r, r + 2);
+        }
+        return c;
+      },
+      init() {
+        const m = localStorage.getItem('sdf_photo_male');
+        const f = localStorage.getItem('sdf_photo_female');
+        this.maleStamp = this.createCircularStamp(m, 64, '🦁', '#f59e0b');
+        this.femaleStamp = this.createCircularStamp(f, 180, '👑', '#f43f5e');
+        this.updatePreview('thumbCanvasMale', this.maleStamp);
+        this.updatePreview('thumbCanvasFemale', this.femaleStamp);
+      },
+      updatePreview(canvasId, srcCanvas) {
+        const dest = document.getElementById(canvasId);
+        if (!dest || !srcCanvas) return;
+        setTimeout(() => {
+          const dctx = dest.getContext('2d');
+          dctx.clearRect(0, 0, 80, 80);
+          dctx.drawImage(srcCanvas, 0, 0, 80, 80);
+        }, 150);
       }
-      state.charBadges[charId] = newBadges;
-      saveStorage();
-      renderBarracks();
-      AudioEngine.play('coin');
-      showToast('バッジガチャを回しました！', 'success');
+    };
+
+    // --- ゲーム状態管理 ---
+    const state = {
+      mqtt: null, mqttOk: false,
+      roomCode: '', isHost: false, isOffline: false,
+      myId: 'p_' + Math.random().toString(36).substr(2, 6),
+      myName: '防衛隊員01',
+      status: 'TITLE',
+      wave: 1,
+      selectedChar: 'fist',
+      coins: parseInt(localStorage.getItem('sdf_coins') || '0', 10),
+      unlockedChars: JSON.parse(localStorage.getItem('sdf_unlocked') || '["fist"]'),
+      charBadges: JSON.parse(localStorage.getItem('sdf_badges') || '{}'),
+      localX: WORLD.ovumX, localY: WORLD.ovumY - 140, localAim: 0,
+      isMouseDown: false, lastAtkTime: 0,
+      localReviveProgress: 0,
+      players: [],
+      readySet: new Set(),
+      enemies: [],
+      projectiles: [],
+      particles: [],
+      texts: [],
+      turrets: [],
+      barrierHp: 100, maxBarrierHp: 100,
+      acidField: false, turretRate: 1.0,
+      shopBuffs: { maxHpBonus: 0, atk: 1.0, spd: 1.0, cd: 1.0, rng: 1.0, kb: 1.0, coin: 1.0, regen: 0, crit: 0 },
+      camera: { x: WORLD.ovumX, y: WORLD.ovumY }
+    };
+
+    function saveStorage() {
+      localStorage.setItem('sdf_coins', state.coins.toString());
+      localStorage.setItem('sdf_unlocked', JSON.stringify(state.unlockedChars));
+      localStorage.setItem('sdf_badges', JSON.stringify(state.charBadges));
     }
 
-    function getCharStatMultipliers(charId) {
+    // バッジ能力値合算計算
+    function getBadgeMultipliers(charId) {
       const badges = state.charBadges[charId] || [];
-      const m = { spd: 1.0, atk: 1.0, rng: 1.0, kb: 1.0, luck: 1.0 };
+      const m = { spd: 1.0, atk: 1.0, rng: 1.0, kb: 1.0, coin: 1.0 };
       badges.forEach(b => {
         if (b.typeId === 'spd') m.spd += b.value / 100;
         if (b.typeId === 'atk') m.atk += b.value / 100;
         if (b.typeId === 'rng') m.rng += b.value / 100;
         if (b.typeId === 'kb') m.kb += b.value / 100;
-        if (b.typeId === 'luck') m.luck += b.value / 100;
+        if (b.typeId === 'coin') m.coin += b.value / 100;
       });
-      m.atk *= state.playerBuffs.atk * state.teamBuffs.atk;
-      m.spd *= state.playerBuffs.spd * state.teamBuffs.spd;
-      m.rng *= state.playerBuffs.rng;
-      m.kb *= state.playerBuffs.kb;
-      m.luck *= state.playerBuffs.luck;
       return m;
     }
 
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function s2w(sx, sy) {
+      return { x: sx + state.camera.x - canvas.width / 2, y: sy + state.camera.y - canvas.height / 2 };
+    }
+
+    // --- 入力制御 ---
+    const inp = { u: false, d: false, l: false, r: false, tOn: false, tx: 0, ty: 0, cx: 0, cy: 0 };
+    window.addEventListener('keydown', e => {
+      if (['w','ArrowUp'].includes(e.key)) inp.u = true;
+      if (['s','ArrowDown'].includes(e.key)) inp.d = true;
+      if (['a','ArrowLeft'].includes(e.key)) inp.l = true;
+      if (['d','ArrowRight'].includes(e.key)) inp.r = true;
+    });
+    window.addEventListener('keyup', e => {
+      if (['w','ArrowUp'].includes(e.key)) inp.u = false;
+      if (['s','ArrowDown'].includes(e.key)) inp.d = false;
+      if (['a','ArrowLeft'].includes(e.key)) inp.l = false;
+      if (['d','ArrowRight'].includes(e.key)) inp.r = false;
+    });
+    window.addEventListener('mousemove', e => {
+      const w = s2w(e.clientX, e.clientY);
+      state.localAim = Math.atan2(w.y - state.localY, w.x - state.localX);
+    });
+    window.addEventListener('mousedown', e => {
+      if (e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('#hudTop') || e.target.closest('#modalWaveShop')) return;
+      state.isMouseDown = true;
+      AudioEngine.init();
+      const w = s2w(e.clientX, e.clientY);
+      state.localAim = Math.atan2(w.y - state.localY, w.x - state.localX);
+      tryAttack();
+    });
+    window.addEventListener('mouseup', () => { state.isMouseDown = false; });
+
+    canvas.addEventListener('touchstart', e => {
+      AudioEngine.init();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.clientX < window.innerWidth * 0.45) {
+          inp.tOn = true; inp.tx = t.clientX; inp.ty = t.clientY; inp.cx = t.clientX; inp.cy = t.clientY;
+        } else {
+          state.isMouseDown = true;
+          const w = s2w(t.clientX, t.clientY);
+          state.localAim = Math.atan2(w.y - state.localY, w.x - state.localX);
+          tryAttack();
+        }
+      }
+    }, { passive: false });
+    canvas.addEventListener('touchmove', e => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (inp.tOn && t.clientX < window.innerWidth * 0.5) { inp.cx = t.clientX; inp.cy = t.clientY; }
+        else {
+          const w = s2w(t.clientX, t.clientY);
+          state.localAim = Math.atan2(w.y - state.localY, w.x - state.localX);
+        }
+      }
+    }, { passive: false });
+    canvas.addEventListener('touchend', e => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].clientX < window.innerWidth * 0.5) inp.tOn = false;
+        else state.isMouseDown = false;
+      }
+    });
+
+    // --- 攻撃アクション実行 ---
     function tryAttack() {
       if (state.status !== 'RUNNING') return;
       const me = state.players.find(p => p.id === state.myId);
       if (!me || me.downed) return;
-
-      const charDef = CHARACTERS.find(c => c.id === state.selectedChar) || CHARACTERS[0];
-      if (charDef.id === 'neet') return;
+      const c = CHARACTERS.find(ch => ch.id === state.selectedChar) || CHARACTERS[0];
+      if (c.id === 'neet') return;
 
       const now = performance.now() / 1000;
-      const finalCd = charDef.cd * state.playerBuffs.cd;
-      if (now - state.lastAttackTime < finalCd) return;
-      state.lastAttackTime = now;
+      const cd = c.cd * state.shopBuffs.cd;
+      if (now - state.lastAtkTime < cd) return;
+      state.lastAtkTime = now;
 
-      const mult = getCharStatMultipliers(charDef.id);
-      const angle = state.localAimAngle;
-      let dmg = Math.round(charDef.dmg * mult.atk);
-      const isCrit = (Math.random() < state.playerBuffs.crit);
-      if (isCrit) dmg = Math.round(dmg * 2.0);
+      const bMult = getBadgeMultipliers(c.id);
+      let dmg = Math.round(c.dmg * bMult.atk * state.shopBuffs.atk);
+      if (Math.random() < state.shopBuffs.crit) {
+        dmg *= 2;
+        addText(state.localX, state.localY - 25, 'CRIT!', '#fbbf24');
+      }
 
-      const kb = Math.round(charDef.kb * mult.kb);
-      const range = charDef.range * mult.rng;
+      const kb = Math.round(c.kb * bMult.kb * state.shopBuffs.kb);
+      const rng = c.range * bMult.rng * state.shopBuffs.rng;
+      const ang = state.localAim;
 
-      if (charDef.isBomb) {
+      if (c.isBomb) {
         AudioEngine.play('punch');
-        spawnProjectile(state.localX, state.localY, angle, 420, range, 'bomb', dmg, kb, isCrit);
-      } else if (charDef.isBullet) {
+        state.projectiles.push({ x: state.localX, y: state.localY, sx: state.localX, sy: state.localY, vx: Math.cos(ang) * 440, vy: Math.sin(ang) * 440, maxD: rng, type: 'bomb', dmg, kb, ang });
+      } else if (c.isBullet) {
         AudioEngine.play('gun');
-        spawnProjectile(state.localX, state.localY, angle, 900, range, 'bullet', dmg, kb, isCrit);
-      } else if (charDef.isMagic) {
+        state.projectiles.push({ x: state.localX, y: state.localY, sx: state.localX, sy: state.localY, vx: Math.cos(ang) * 920, vy: Math.sin(ang) * 920, maxD: rng, type: 'bullet', dmg, kb, ang });
+      } else if (c.isMagic) {
         AudioEngine.play('magic');
-        spawnProjectile(state.localX, state.localY, angle - 0.22, 580, range, 'magic', dmg, kb, isCrit);
-        spawnProjectile(state.localX, state.localY, angle + 0.22, 580, range, 'magic', dmg, kb, isCrit);
+        // 左右2連ホーミング弾
+        state.projectiles.push({ x: state.localX, y: state.localY, sx: state.localX, sy: state.localY, vx: Math.cos(ang - 0.22) * 580, vy: Math.sin(ang - 0.22) * 580, maxD: rng, type: 'magic', dmg, kb, ang: ang - 0.22 });
+        state.projectiles.push({ x: state.localX, y: state.localY, sx: state.localX, sy: state.localY, vx: Math.cos(ang + 0.22) * 580, vy: Math.sin(ang + 0.22) * 580, maxD: rng, type: 'magic', dmg, kb, ang: ang + 0.22 });
       } else {
         AudioEngine.play('punch');
-        executeMeleeAttack(state.localX, state.localY, angle, range, dmg, kb, charDef.id, isCrit);
+        for (let i = 0; i < 4; i++) {
+          const a = ang + (Math.random() - 0.5) * 0.8;
+          state.particles.push({ x: state.localX + Math.cos(a) * (rng * 0.6), y: state.localY + Math.sin(a) * (rng * 0.6), vx: Math.cos(a) * 50, vy: Math.sin(a) * 50, col: '#f43f5e', l: 0.15, ml: 0.15, s: 4 });
+        }
+        if (state.isHost) {
+          applyMelee(state.localX, state.localY, ang, rng, dmg, kb, c.id);
+        } else {
+          send({ t: 'ATK_MELEE', x: Math.round(state.localX), y: Math.round(state.localY), ang: Math.round(ang * 100) / 100, rng, dmg, kb, cId: c.id });
+        }
       }
     }
 
-    function spawnProjectile(x, y, angle, speed, maxDist, type, dmg, kb, isCrit) {
-      state.projectiles.push({
-        x: x + Math.cos(angle) * 20,
-        y: y + Math.sin(angle) * 20,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        startX: x,
-        startY: y,
-        maxDist: maxDist,
-        type: type,
-        dmg: dmg,
-        kb: kb,
-        isCrit: !!isCrit,
-        angle: angle
-      });
-    }
-
-    function executeMeleeAttack(px, py, angle, range, dmg, kb, charId, isCrit) {
-      const hitRadius = range;
+    function applyMelee(px, py, ang, rng, dmg, kb, charId) {
       const arcSpread = charId === 'knife' ? 0.9 : (charId === 'spear' ? 0.45 : 1.3);
-
-      for (let i = 0; i < 4; i++) {
-        const pAng = angle + (Math.random() - 0.5) * arcSpread;
-        state.particles.push({
-          x: px + Math.cos(pAng) * (range * 0.7),
-          y: py + Math.sin(pAng) * (range * 0.7),
-          vx: Math.cos(pAng) * 60,
-          vy: Math.sin(pAng) * 60,
-          color: isCrit ? '#fbbf24' : (charId === 'knife' ? '#38bdf8' : (charId === 'spear' ? '#f59e0b' : '#f43f5e')),
-          life: 0.15,
-          maxLife: 0.15,
-          size: isCrit ? 5 : 3.5
-        });
-      }
-
-      if (!state.isHost) {
-        broadcastPacket({ t: 'M_HIT', p: [Math.round(px), Math.round(py)], a: Math.round(angle * 100) / 100, r: Math.round(range), d: dmg, k: kb, s: arcSpread, c: isCrit ? 1 : 0 });
-        return;
-      }
-      applyMeleeDamage(px, py, angle, hitRadius, arcSpread, dmg, kb, isCrit);
-    }
-
-    function applyMeleeDamage(px, py, angle, hitRadius, arcSpread, dmg, kb, isCrit) {
       state.enemies.forEach(e => {
-        const dx = e.x - px;
-        const dy = e.y - py;
-        const d = Math.hypot(dx, dy);
-        if (d <= hitRadius + e.radius) {
-          const enemyAngle = Math.atan2(dy, dx);
-          let diff = Math.abs(enemyAngle - angle);
+        const dx = e.x - px, dy = e.y - py;
+        if (Math.hypot(dx, dy) <= rng + e.rad) {
+          let diff = Math.abs(Math.atan2(dy, dx) - ang);
           while (diff > Math.PI) diff -= Math.PI * 2;
-          diff = Math.abs(diff);
-
-          if (diff <= arcSpread * 0.5) {
-            damageEnemy(e, dmg, kb, Math.cos(enemyAngle), Math.sin(enemyAngle), isCrit);
-          }
+          if (Math.abs(diff) <= arcSpread * 0.5) hitEnemy(e, dmg, kb, Math.cos(ang), Math.sin(ang));
         }
       });
     }
 
-    function damageEnemy(e, dmg, kb, kbx, kby, isCrit = false) {
+    function hitEnemy(e, dmg, kb, kbx, kby) {
       if (e.hp <= 0) return;
       e.hp -= dmg;
-      const kbMult = e.isBoss ? 0.20 : 1.0;
-      e.vx += kbx * (kb * kbMult);
-      e.vy += kby * (kb * kbMult);
-
-      spawnFloatingText(e.x, e.y - e.radius, (isCrit ? 'CRIT! ' : '') + `-${dmg}`, isCrit ? '#facc15' : (e.isBoss ? '#f59e0b' : '#f43f5e'));
-
-      if (e.hp <= 0) {
-        killEnemy(e);
-      }
+      const kbm = e.isB ? 0.2 : 1.0;
+      e.vx += kbx * (kb * kbm);
+      e.vy += kby * (kb * kbm);
+      addText(e.x, e.y - e.rad, `-${dmg}`, e.isB ? '#f59e0b' : '#ef4444');
+      if (e.hp <= 0) killEnemy(e);
     }
 
     function killEnemy(e) {
-      const mult = getCharStatMultipliers(state.selectedChar);
-      const baseReward = e.isBoss ? (50 + state.wave * 12) : Math.floor(1 + Math.random() * 3);
-      const reward = Math.round(baseReward * mult.luck);
-
+      const bMult = getBadgeMultipliers(state.selectedChar);
+      const reward = Math.round((e.isB ? 50 + state.wave * 10 : 2) * bMult.coin * state.shopBuffs.coin);
       state.coins += reward;
       saveStorage();
       updateHudCoins();
-
-      for (let i = 0; i < (e.isBoss ? 20 : 8); i++) {
-        const ang = Math.random() * Math.PI * 2;
-        const spd = 60 + Math.random() * 150;
-        state.particles.push({
-          x: e.x,
-          y: e.y,
-          vx: Math.cos(ang) * spd,
-          vy: Math.sin(ang) * spd,
-          color: e.isBoss ? '#fbbf24' : '#e2e8f0',
-          life: 0.35,
-          maxLife: 0.35,
-          size: e.isBoss ? 5 : 3
-        });
-      }
-
-      spawnFloatingText(e.x, e.y - 25, `+${reward}🪙`, '#fbbf24');
+      addText(e.x, e.y - 20, `+${reward}🪙`, '#fbbf24');
       AudioEngine.play('punch');
+
+      for (let i = 0; i < (e.isB ? 18 : 6); i++) {
+        const a = Math.random() * Math.PI * 2, sp = 50 + Math.random() * 120;
+        state.particles.push({ x: e.x, y: e.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, col: e.isB ? '#fbbf24' : '#e2e8f0', l: 0.3, ml: 0.3, s: 4 });
+      }
       state.enemies = state.enemies.filter(item => item.id !== e.id);
     }
 
-    function spawnFloatingText(x, y, text, color) {
-      state.floatingTexts.push({
-        x: x + (Math.random() - 0.5) * 8,
-        y: y,
-        text: text,
-        color: color,
-        life: 0.6,
-        maxLife: 0.6
-      });
+    function addText(x, y, txt, col) {
+      state.texts.push({ x, y, txt, col, l: 0.6, ml: 0.6 });
     }
 
-    function startWave(waveNum) {
-      state.wave = waveNum;
+    // --- 無限ウェーブ生成式 ---
+    function startWave(w) {
+      state.wave = w;
       state.status = 'RUNNING';
-      state.waveClearTriggered = false;
-      state.readyPlayerIds.clear();
-      state.isMyReady = false;
-
-      document.getElementById('hudWaveNum').innerText = `WAVE ${waveNum}`;
-
+      document.getElementById('hudWaveNum').innerText = `WAVE ${w}`;
       if (state.isHost) {
         state.enemies = [];
-        const isBossWave = (waveNum % 5 === 0);
-        const totalNormal = Math.floor(10 + Math.pow(waveNum, 1.25) * 3);
-
-        state.waveSpawnQueue = [];
-        for (let i = 0; i < totalNormal; i++) {
-          state.waveSpawnQueue.push({
-            delay: Math.random() * Math.min(25, 8 + waveNum * 1.5),
-            type: Math.random() < 0.25 ? 'fast' : (Math.random() < 0.15 ? 'tank' : 'normal')
-          });
+        const isB = (w % 5 === 0);
+        const count = Math.floor(10 + Math.pow(w, 1.2) * 3);
+        state.spawnQ = [];
+        for (let i = 0; i < count; i++) {
+          state.spawnQ.push({ del: Math.random() * Math.min(20, 6 + w * 1.5), type: Math.random() < 0.25 ? 'fast' : (Math.random() < 0.15 ? 'tank' : 'normal') });
         }
-
-        if (isBossWave) {
-          spawnBoss(waveNum);
-        }
+        if (isB) spawnBoss(w);
       }
     }
 
-    function spawnBoss(waveNum) {
-      const bossTypes = ['summoner', 'rusher', 'curser', 'hybrid'];
-      const chosenType = bossTypes[(Math.floor(waveNum / 5) - 1) % bossTypes.length];
-      const bossBaseHp = Math.floor(450 + Math.pow(waveNum, 1.5) * 80);
-
-      const angle = Math.random() * Math.PI * 2;
-      const spawnDist = 1100;
-      const bx = WORLD.ovumX + Math.cos(angle) * spawnDist;
-      const by = WORLD.ovumY + Math.sin(angle) * spawnDist;
+    function spawnBoss(w) {
+      const a = Math.random() * Math.PI * 2;
+      const bx = WORLD.ovumX + Math.cos(a) * 1050, by = WORLD.ovumY + Math.sin(a) * 1050;
+      const hp = Math.floor(400 + Math.pow(w, 1.45) * 70);
+      const bTypes = ['summoner', 'rusher', 'hybrid'];
+      const chosenType = bTypes[(Math.floor(w / 5) - 1) % bTypes.length];
 
       state.enemies.push({
-        id: 'b_' + waveNum + '_' + Date.now().toString(36),
-        x: bx,
-        y: by,
-        tx: bx,
-        ty: by,
-        vx: 0,
-        vy: 0,
-        hp: bossBaseHp,
-        maxHp: bossBaseHp,
-        radius: 50,
-        speed: 65 + Math.min(60, waveNum * 2),
-        isBoss: true,
-        bossType: chosenType,
-        skillTimer: 3.0,
-        targetMode: 'hybrid',
-        facingAngle: Math.atan2(WORLD.ovumY - by, WORLD.ovumX - bx),
-        tang: Math.atan2(WORLD.ovumY - by, WORLD.ovumX - bx),
-        tailPhase: Math.random() * 10,
-        atkCooldown: 0,
-        atk: 25 + Math.floor(waveNum * 1.5)
+        id: 'b_' + Date.now(), x: bx, y: by, tx: bx, ty: by, vx: 0, vy: 0,
+        hp, maxHp: hp, rad: 48, spd: 70 + Math.min(50, w * 2), isB: true,
+        bType: chosenType, skillTimer: 3.5,
+        ang: Math.atan2(WORLD.ovumY - by, WORLD.ovumX - bx), atkCd: 0, atk: 25 + Math.floor(w * 1.2)
       });
     }
 
-    function spawnEnemyInstance(type) {
-      const angle = Math.random() * Math.PI * 2;
-      const spawnDist = 1000 + Math.random() * 200;
-      const ex = WORLD.ovumX + Math.cos(angle) * spawnDist;
-      const ey = WORLD.ovumY + Math.sin(angle) * spawnDist;
-
-      let hp = Math.floor(25 + state.wave * 5);
-      let spd = 90 + Math.min(80, state.wave * 2.5);
-      let rad = 16;
-      let atkVal = 14 + Math.floor(state.wave * 0.8);
-
-      if (type === 'fast') {
-        hp = Math.floor(hp * 0.65);
-        spd = Math.floor(spd * 1.45);
-        rad = 13;
-        atkVal = Math.floor(atkVal * 0.8);
-      } else if (type === 'tank') {
-        hp = Math.floor(hp * 2.2);
-        spd = Math.floor(spd * 0.75);
-        rad = 20;
-        atkVal = Math.floor(atkVal * 1.4);
-      }
+    function spawnEnemy(t) {
+      const a = Math.random() * Math.PI * 2;
+      const ex = WORLD.ovumX + Math.cos(a) * 1000, ey = WORLD.ovumY + Math.sin(a) * 1000;
+      let hp = 25 + state.wave * 5, spd = 95 + Math.min(70, state.wave * 2), rad = 17, atk = 14;
+      if (t === 'fast') { hp *= 0.65; spd *= 1.4; rad = 14; atk *= 0.8; }
+      else if (t === 'tank') { hp *= 2.0; spd *= 0.75; rad = 22; atk *= 1.4; }
 
       state.enemies.push({
-        id: 'e_' + Math.random().toString(36).substring(2, 6),
-        x: ex,
-        y: ey,
-        tx: ex,
-        ty: ey,
-        vx: 0,
-        vy: 0,
-        hp: hp,
-        maxHp: hp,
-        radius: rad,
-        speed: spd,
-        isBoss: false,
-        targetMode: Math.random() < 0.35 ? 'player' : (Math.random() < 0.65 ? 'hybrid' : 'ovum'),
-        facingAngle: Math.atan2(WORLD.ovumY - ey, WORLD.ovumX - ex),
-        tang: Math.atan2(WORLD.ovumY - ey, WORLD.ovumX - ex),
-        tailPhase: Math.random() * 10,
-        atkCooldown: 0,
-        atk: atkVal
+        id: 'e_' + Math.random().toString(36).substr(2, 6),
+        x: ex, y: ey, tx: ex, ty: ey, vx: 0, vy: 0,
+        hp: Math.round(hp), maxHp: Math.round(hp), rad, spd: Math.round(spd), isB: false,
+        ang: Math.atan2(WORLD.ovumY - ey, WORLD.ovumX - ex), atkCd: 0, atk: Math.round(atk)
       });
     }
 
-    function executeWaveClearRevive() {
-      state.players.forEach(p => {
-        p.downed = false;
-        p.hp = p.maxHp;
-      });
-      state.localReviveProgress = 0;
+    // --- ゲームループ ---
+    let lastT = performance.now();
+    function loop(now) {
+      const dt = Math.min(0.05, (now - lastT) / 1000);
+      lastT = now;
 
-      AudioEngine.play('revive');
-      showToast('🎉 WAVE CLEAR! 殉職した隊員が全員全快復活しました！', 'success');
-
-      state.floatingTexts.push({
-        x: state.localX,
-        y: state.localY - 45,
-        text: '✨ 部隊全員全快復活!! ✨',
-        color: '#34d399',
-        life: 1.5,
-        maxLife: 1.5
-      });
+      if (state.status === 'RUNNING') update(dt);
+      render();
+      requestAnimationFrame(loop);
     }
 
-    function checkWaveClearCondition() {
-      if (state.enemies.length === 0 && (!state.waveSpawnQueue || state.waveSpawnQueue.length === 0)) {
-        if (!state.waveClearTriggered) {
-          state.waveClearTriggered = true;
-          executeWaveClearRevive();
-          broadcastPacket({ t: 'W_REVIVE' });
-          openWaveShop();
-        }
-      }
-    }
-
-    function openWaveShop() {
-      state.status = 'SHOP';
-      state.isMyReady = false;
-      state.readyPlayerIds.clear();
-
-      document.getElementById('modalWaveShop').classList.remove('hidden');
-      updateHudCoins();
-      renderShopItems();
-      updateReadyIndicator();
-
-      broadcastPacket({ t: 'O_SHOP' });
-    }
-
-    function renderShopItems() {
-      const grid = document.getElementById('shopItemGrid');
-      grid.innerHTML = '';
-
-      SHOP_ITEMS_16.forEach(item => {
-        const card = document.createElement('div');
-        const isGlobal = (item.cat === 'global');
-        card.className = `p-2.5 rounded-2xl border flex flex-col justify-between transition ${
-          isGlobal ? 'bg-indigo-950/40 border-indigo-500/50 hover:border-indigo-400' : 'bg-slate-800/70 border-slate-700 hover:border-slate-500'
-        }`;
-
-        card.innerHTML = `
-          <div>
-            <div class="flex items-center justify-between gap-1 mb-1">
-              <span class="text-xs sm:text-sm font-black flex items-center gap-1.5 ${item.color}">
-                <i class="fa-solid ${item.icon}"></i>
-                <span>${item.name}</span>
-              </span>
-              <span class="text-[9px] px-1.5 py-0.5 rounded font-black ${isGlobal ? 'bg-indigo-500/30 text-indigo-300 border border-indigo-400/40' : 'bg-slate-700 text-slate-300'}">
-                ${isGlobal ? '全体' : '個人'}
-              </span>
-            </div>
-            <p class="text-[10px] text-slate-400 leading-tight mb-2">${item.desc}</p>
-          </div>
-          <button class="comic-btn w-full py-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 text-slate-950 font-black text-xs rounded-xl flex items-center justify-center gap-1">
-            <i class="fa-solid fa-coins text-[10px]"></i>
-            <span>${item.cost} コイン</span>
-          </button>
-        `;
-
-        card.querySelector('button').onclick = () => buyShopItem(item);
-        grid.appendChild(card);
-      });
-    }
-
-    function buyShopItem(item) {
-      if (state.coins < item.cost) {
-        showToast(`コインが足りません！ (必要: ${item.cost} 🪙)`, 'warn');
-        return;
-      }
-      state.coins -= item.cost;
-      saveStorage();
-      updateHudCoins();
-      AudioEngine.play('coin');
-      showToast(`${item.name} を購入しました！`, 'success');
-
-      applyPurchasedItem(item.id, state.myId);
-
-      if (item.cat === 'global') {
-        broadcastPacket({ t: 'G_ITEM', id: item.id });
-      }
-    }
-
-    function applyPurchasedItem(itemId, buyerId) {
-      const buyer = state.players.find(p => p.id === buyerId);
-      switch (itemId) {
-        case 'p_heal':
-          if (buyer) buyer.hp = Math.min(buyer.maxHp, buyer.hp + 60);
-          break;
-        case 'p_maxhp':
-          if (buyer) {
-            buyer.maxHp += 25;
-            buyer.hp = buyer.maxHp;
-          }
-          break;
-        case 'p_atk': state.playerBuffs.atk += 0.18; break;
-        case 'p_spd': state.playerBuffs.spd += 0.12; break;
-        case 'p_cd': state.playerBuffs.cd = Math.max(0.35, state.playerBuffs.cd * 0.88); break;
-        case 'p_range': state.playerBuffs.rng += 0.20; break;
-        case 'p_kb': state.playerBuffs.kb += 0.35; break;
-        case 'p_luck': state.playerBuffs.luck += 0.25; break;
-        case 'p_regen': state.playerBuffs.regen += 2.0; break;
-        case 'p_crit': state.playerBuffs.crit = Math.min(0.75, state.playerBuffs.crit + 0.15); break;
-
-        case 'g_repair':
-          state.barrierHp = Math.min(state.maxBarrierHp, state.barrierHp + 35);
-          break;
-        case 'g_maxbarrier':
-          state.maxBarrierHp += 30;
-          state.barrierHp = state.maxBarrierHp;
-          break;
-        case 'g_turret':
-          const ang = Math.random() * Math.PI * 2;
-          state.turrets.push({
-            x: WORLD.ovumX + Math.cos(ang) * 165,
-            y: WORLD.ovumY + Math.sin(ang) * 165,
-            cooldown: 0
-          });
-          break;
-        case 'g_turret_boost':
-          state.teamBuffs.turretRate *= 0.70;
-          break;
-        case 'g_acid_zone':
-          state.teamBuffs.acidZone = true;
-          break;
-        case 'g_rally_cry':
-          state.teamBuffs.atk += 0.12;
-          state.teamBuffs.spd += 0.08;
-          break;
-      }
-    }
-
-    function toggleMyReadyState() {
-      state.isMyReady = !state.isMyReady;
-      if (state.isMyReady) state.readyPlayerIds.add(state.myId);
-      else state.readyPlayerIds.delete(state.myId);
-
-      broadcastPacket({ t: 'READY', p: state.myId, r: state.isMyReady ? 1 : 0 });
-      updateReadyIndicator();
-      checkAllReadyConsensus();
-    }
-
-    function updateReadyIndicator() {
-      const readyCnt = state.readyPlayerIds.size;
-      const totalCnt = Math.max(1, state.players.length);
-
-      document.getElementById('shopReadyCount').innerText = readyCnt;
-      document.getElementById('shopTotalCount').innerText = totalCnt;
-
-      const btn = document.getElementById('btnShopReadyToggle');
-      const txt = document.getElementById('btnShopReadyTxt');
-      if (state.isMyReady) {
-        btn.className = 'w-full sm:w-auto comic-btn px-7 py-2.5 bg-slate-700 hover:bg-slate-600 text-white font-black text-xs sm:text-sm rounded-2xl border-2 border-slate-500 flex items-center justify-center gap-1.5';
-        txt.innerText = '準備完了解除';
-      } else {
-        btn.className = 'w-full sm:w-auto comic-btn px-7 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-xs sm:text-sm rounded-2xl border-2 border-emerald-400 flex items-center justify-center gap-1.5';
-        txt.innerText = '準備完了 (次へ進む)';
-      }
-    }
-
-    function checkAllReadyConsensus() {
-      const totalCnt = Math.max(1, state.players.length);
-      if (state.readyPlayerIds.size >= totalCnt) {
-        if (state.isOffline || state.isHost) {
-          executeAdvanceNextWave();
-        }
-      }
-    }
-
-    function executeAdvanceNextWave() {
-      document.getElementById('modalWaveShop').classList.add('hidden');
-      broadcastPacket({ t: 'ADVANCE' });
-      startWave(state.wave + 1);
-    }
-
-    let lastFrameTime = performance.now();
-
-    function gameLoop(now) {
-      const dt = Math.min(0.06, (now - lastFrameTime) / 1000);
-      lastFrameTime = now;
-
-      if (state.status === 'RUNNING') {
-        updateGame(dt);
-      }
-
-      renderGame(dt);
-      requestAnimationFrame(gameLoop);
-    }
-
-    function updateGame(dt) {
-      updateLocalPlayer(dt);
-
-      if (state.isMouseDown) {
-        const charDef = CHARACTERS.find(c => c.id === state.selectedChar) || CHARACTERS[0];
-        if (charDef.auto) tryAttack();
-      }
-
-      updateProjectiles(dt);
-      updateTurrets(dt);
-
-      if (state.isHost) {
-        updateEnemiesAsHost(dt);
-        checkWaveClearCondition();
-      }
-
-      updateEffects(dt);
-
-      state.camera.x += (state.localX - state.camera.x) * 0.15;
-      state.camera.y += (state.localY - state.camera.y) * 0.15;
-
-      updateHUD();
-    }
-
-    function updateLocalPlayer(dt) {
+    function update(dt) {
       const me = state.players.find(p => p.id === state.myId);
-      if (!me) return;
 
-      if (state.playerBuffs.regen > 0 && !me.downed) {
-        me.hp = Math.min(me.maxHp, me.hp + state.playerBuffs.regen * dt);
-      }
-
-      if (me.downed) {
-        checkRescueByNearbyAllies(dt);
-        return;
-      }
-
-      let dx = 0;
-      let dy = 0;
-      if (inputState.up) dy -= 1;
-      if (inputState.down) dy += 1;
-      if (inputState.left) dx -= 1;
-      if (inputState.right) dx += 1;
-
-      if (inputState.touchActive) {
-        const tdx = inputState.touchCurX - inputState.touchStartX;
-        const tdy = inputState.touchCurY - inputState.touchStartY;
-        const tDist = Math.hypot(tdx, tdy);
-        if (tDist > 12) {
-          dx = tdx / tDist;
-          dy = tdy / tDist;
-        }
-      }
-
-      const len = Math.hypot(dx, dy);
-      const charDef = CHARACTERS.find(c => c.id === state.selectedChar) || CHARACTERS[0];
-      const mult = getCharStatMultipliers(charDef.id);
-      const speed = charDef.speed * mult.spd;
-
-      if (len > 0) {
-        state.localX += (dx / len) * speed * dt;
-        state.localY += (dy / len) * speed * dt;
-        state.localX = Math.max(60, Math.min(WORLD.width - 60, state.localX));
-        state.localY = Math.max(60, Math.min(WORLD.height - 60, state.localY));
-      }
-
-      me.x = state.localX;
-      me.y = state.localY;
-      me.aimAngle = state.localAimAngle;
-
-      throttledSyncLocalPlayer();
-    }
-
-    function checkRescueByNearbyAllies(dt) {
-      const me = state.players.find(p => p.id === state.myId);
-      const saviors = state.players.filter(p => p.id !== state.myId && !p.downed && Math.hypot(p.x - state.localX, p.y - state.localY) < 70);
-      if (saviors.length > 0) {
-        state.localReviveProgress += dt * 0.45;
-        if (state.localReviveProgress >= 1.0) {
-          me.downed = false;
-          me.hp = Math.floor(me.maxHp * 0.5);
-          state.localReviveProgress = 0;
-          spawnFloatingText(state.localX, state.localY - 30, 'RESCUED!', '#10b981');
-          AudioEngine.play('coin');
-          broadcastPacket({ t: 'REVIVE', id: state.myId });
-        }
-      } else {
-        state.localReviveProgress = Math.max(0, state.localReviveProgress - dt * 0.2);
-      }
-    }
-
-    function updateEnemiesAsHost(dt) {
-      if (state.waveSpawnQueue && state.waveSpawnQueue.length > 0) {
-        for (let i = state.waveSpawnQueue.length - 1; i >= 0; i--) {
-          const item = state.waveSpawnQueue[i];
-          item.delay -= dt;
-          if (item.delay <= 0) {
-            spawnEnemyInstance(item.type);
-            state.waveSpawnQueue.splice(i, 1);
-          }
-        }
-      }
-
-      const alivePlayers = state.players.filter(p => !p.downed);
-
-      state.enemies.forEach(e => {
-        if (e.atkCooldown > 0) {
-          e.atkCooldown = Math.max(0, e.atkCooldown - dt);
-        }
-
-        let targetX = WORLD.ovumX;
-        let targetY = WORLD.ovumY;
-
-        if (e.targetMode === 'player' && alivePlayers.length > 0) {
-          let nearestP = alivePlayers[0];
-          let minDist = Math.hypot(nearestP.x - e.x, nearestP.y - e.y);
-          alivePlayers.forEach(p => {
-            const d = Math.hypot(p.x - e.x, p.y - e.y);
-            if (d < minDist) { minDist = d; nearestP = p; }
-          });
-          targetX = nearestP.x;
-          targetY = nearestP.y;
-        }
-
-        const tdx = targetX - e.x;
-        const tdy = targetY - e.y;
-        const tDist = Math.hypot(tdx, tdy) || 0.001;
-
-        e.facingAngle = Math.atan2(tdy, tdx);
-
-        if (e.isBoss) {
-          e.skillTimer -= dt;
-          if (e.skillTimer <= 0) {
-            executeBossSkill(e, alivePlayers);
-            e.skillTimer = 4.0 + Math.random() * 2.5;
-          }
-        }
-
-        let spdMult = 1.0;
-        if (state.teamBuffs.acidZone && Math.hypot(e.x - WORLD.ovumX, e.y - WORLD.ovumY) < 260) {
-          spdMult = 0.65;
-        }
-
-        e.x += (tdx / tDist) * (e.speed * spdMult) * dt + e.vx * dt;
-        e.y += (tdy / tDist) * (e.speed * spdMult) * dt + e.vy * dt;
-        e.vx *= 0.88;
-        e.vy *= 0.88;
-
-        alivePlayers.forEach(p => {
-          const distToP = Math.hypot(p.x - e.x, p.y - e.y);
-          if (distToP < (e.radius + 22) && e.atkCooldown <= 0) {
-            const dmg = e.atk || 15;
-            p.hp = Math.max(0, p.hp - dmg);
-            e.atkCooldown = 0.85;
-
-            AudioEngine.play('bite');
-            spawnFloatingText(p.x, p.y - 20, `-${dmg}`, '#ef4444');
-
-            for (let i = 0; i < 4; i++) {
-              state.particles.push({
-                x: p.x, y: p.y,
-                vx: (Math.random() - 0.5) * 100, vy: (Math.random() - 0.5) * 100,
-                color: '#ef4444', life: 0.2, maxLife: 0.2, size: 3
-              });
+      // 自機移動 & ダウン時救助受付
+      if (me) {
+        if (me.downed) {
+          // 近くにいる味方が救助
+          const saviors = state.players.filter(p => p.id !== state.myId && !p.downed && Math.hypot(p.x - state.localX, p.y - state.localY) < 70);
+          if (saviors.length > 0) {
+            state.localReviveProgress += dt * 0.5;
+            if (state.localReviveProgress >= 1.0) {
+              me.downed = false; me.hp = Math.floor(me.maxHp * 0.5); state.localReviveProgress = 0;
+              addText(state.localX, state.localY - 30, 'RESCUED!', '#10b981');
+              AudioEngine.play('coin');
+              send({ t: 'REVIVE', id: state.myId });
             }
-
-            if (p.hp <= 0) {
-              p.downed = true;
-              spawnFloatingText(p.x, p.y - 35, 'DOWN!!', '#dc2626');
-            }
-          }
-        });
-
-        const distToOvum = Math.hypot(WORLD.ovumX - e.x, WORLD.ovumY - e.y);
-
-        if (state.barrierHp > 0) {
-          if (distToOvum <= WORLD.barrierRadius + e.radius) {
-            const barrierDmg = e.isBoss ? 25 : 8;
-            state.barrierHp = Math.max(0, state.barrierHp - barrierDmg);
-            AudioEngine.play('bomb');
-            spawnFloatingText(e.x, e.y, `BARRIER -${barrierDmg}`, '#ec4899');
-            if (!e.isBoss) {
-              e.hp = 0;
-              killEnemy(e);
-            } else {
-              const pushAng = Math.atan2(e.y - WORLD.ovumY, e.x - WORLD.ovumX);
-              e.vx += Math.cos(pushAng) * 350;
-              e.vy += Math.sin(pushAng) * 350;
-            }
+          } else {
+            state.localReviveProgress = Math.max(0, state.localReviveProgress - dt * 0.2);
           }
         } else {
-          if (distToOvum <= WORLD.ovumRadius + e.radius) {
-            triggerGameOver();
+          let dx = 0, dy = 0;
+          if (inp.u) dy -= 1; if (inp.d) dy += 1; if (inp.l) dx -= 1; if (inp.r) dx += 1;
+          if (inp.tOn) {
+            const tdx = inp.cx - inp.tx, tdy = inp.cy - inp.ty;
+            const d = Math.hypot(tdx, tdy);
+            if (d > 10) { dx = tdx / d; dy = tdy / d; }
           }
+          const len = Math.hypot(dx, dy);
+          const c = CHARACTERS.find(ch => ch.id === state.selectedChar) || CHARACTERS[0];
+          const bMult = getBadgeMultipliers(c.id);
+          const sp = c.speed * bMult.spd * state.shopBuffs.spd;
+          if (len > 0) {
+            state.localX = Math.max(50, Math.min(WORLD.width - 50, state.localX + (dx / len) * sp * dt));
+            state.localY = Math.max(50, Math.min(WORLD.height - 50, state.localY + (dy / len) * sp * dt));
+          }
+          me.x = state.localX; me.y = state.localY; me.ang = state.localAim;
+          syncPlayer();
         }
-      });
-
-      throttledSyncHostEnemies();
-    }
-
-    function executeBossSkill(boss, alivePlayers) {
-      if (boss.bossType === 'summoner' || boss.bossType === 'hybrid') {
-        for (let i = 0; i < 3; i++) spawnEnemyInstance('fast');
-        spawnFloatingText(boss.x, boss.y - 40, '子分召喚！', '#f59e0b');
       }
-      if (boss.bossType === 'rusher' || boss.bossType === 'hybrid') {
-        let tx = WORLD.ovumX, ty = WORLD.ovumY;
-        if (alivePlayers.length > 0) {
-          const nearest = alivePlayers[Math.floor(Math.random() * alivePlayers.length)];
-          tx = nearest.x; ty = nearest.y;
-        }
-        const ang = Math.atan2(ty - boss.y, tx - boss.x);
-        boss.vx += Math.cos(ang) * 420;
-        boss.vy += Math.sin(ang) * 420;
-        AudioEngine.play('bomb');
-        spawnFloatingText(boss.x, boss.y - 40, '突進タックル！', '#ef4444');
-      }
-    }
 
-    function updateProjectiles(dt) {
+      // オート連射
+      if (state.isMouseDown) {
+        const c = CHARACTERS.find(ch => ch.id === state.selectedChar) || CHARACTERS[0];
+        if (c.auto) tryAttack();
+      }
+
+      // リジェネ回復
+      if (state.shopBuffs.regen > 0 && me && !me.downed && me.hp < me.maxHp) {
+        me.hp = Math.min(me.maxHp, me.hp + state.shopBuffs.regen * dt);
+      }
+
+      // 弾丸
       for (let i = state.projectiles.length - 1; i >= 0; i--) {
         const p = state.projectiles[i];
 
+        // 魔法ホーミング
         if (p.type === 'magic' && state.enemies.length > 0) {
-          let closest = null, minDist = 350;
+          let closest = null, minD = 320;
           state.enemies.forEach(e => {
             const d = Math.hypot(e.x - p.x, e.y - p.y);
-            if (d < minDist) { minDist = d; closest = e; }
+            if (d < minD) { minD = d; closest = e; }
           });
           if (closest) {
-            const desiredAng = Math.atan2(closest.y - p.y, closest.x - p.x);
-            p.angle += (desiredAng - p.angle) * 0.15;
-            p.vx = Math.cos(p.angle) * 580;
-            p.vy = Math.sin(p.angle) * 580;
+            const targetAng = Math.atan2(closest.y - p.y, closest.x - p.x);
+            p.ang += (targetAng - p.ang) * 0.15;
+            p.vx = Math.cos(p.ang) * 580; p.vy = Math.sin(p.ang) * 580;
           }
         }
 
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-
-        const distTraveled = Math.hypot(p.x - p.startX, p.y - p.startY);
-        if (distTraveled >= p.maxDist) {
-          if (p.type === 'bomb') explodeBomb(p.x, p.y, p.dmg, p.kb, p.isCrit);
+        p.x += p.vx * dt; p.y += p.vy * dt;
+        if (Math.hypot(p.x - p.sx, p.y - p.sy) >= p.maxD) {
+          if (p.type === 'bomb') explodeBomb(p.x, p.y, p.dmg, p.kb);
           state.projectiles.splice(i, 1);
           continue;
         }
 
         let hit = false;
         for (const e of state.enemies) {
-          if (Math.hypot(e.x - p.x, e.y - p.y) <= (e.radius + 8)) {
+          if (Math.hypot(e.x - p.x, e.y - p.y) <= e.rad + 8) {
             hit = true;
-            if (p.type === 'bomb') {
-              explodeBomb(p.x, p.y, p.dmg, p.kb, p.isCrit);
-            } else {
-              damageEnemy(e, p.dmg, p.kb, Math.cos(p.angle), Math.sin(p.angle), p.isCrit);
-            }
+            if (p.type === 'bomb') explodeBomb(p.x, p.y, p.dmg, p.kb);
+            else if (state.isHost) hitEnemy(e, p.dmg, p.kb, Math.cos(p.ang), Math.sin(p.ang));
             break;
           }
         }
         if (hit) state.projectiles.splice(i, 1);
       }
-    }
 
-    function explodeBomb(bx, by, dmg, kb, isCrit) {
-      AudioEngine.play('bomb');
-      const blastRadius = 150;
-      for (let i = 0; i < 14; i++) {
-        const ang = Math.random() * Math.PI * 2;
-        const spd = 80 + Math.random() * 160;
-        state.particles.push({
-          x: bx, y: by,
-          vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
-          color: isCrit ? '#facc15' : '#f97316',
-          life: 0.3, maxLife: 0.3, size: 4
+      // タレット
+      state.turrets.forEach(t => {
+        t.cd = (t.cd || 0) - dt;
+        if (t.cd <= 0 && state.enemies.length > 0) {
+          const target = state.enemies[0];
+          t.cd = 0.6 / state.turretRate;
+          const a = Math.atan2(target.y - t.y, target.x - t.x);
+          AudioEngine.play('gun');
+          state.projectiles.push({ x: t.x, y: t.y, sx: t.x, sy: t.y, vx: Math.cos(a) * 800, vy: Math.sin(a) * 800, maxD: 300, type: 'bullet', dmg: 20, kb: 80, ang: a });
+        }
+      });
+
+      // 敵シミュレーション
+      if (state.isHost) {
+        if (state.spawnQ && state.spawnQ.length > 0) {
+          for (let i = state.spawnQ.length - 1; i >= 0; i--) {
+            state.spawnQ[i].del -= dt;
+            if (state.spawnQ[i].del <= 0) {
+              spawnEnemy(state.spawnQ[i].type);
+              state.spawnQ.splice(i, 1);
+            }
+          }
+        }
+
+        const alive = state.players.filter(p => !p.downed);
+        state.enemies.forEach(e => {
+          if (e.atkCd > 0) e.atkCd -= dt;
+
+          // ボススキル
+          if (e.isB) {
+            e.skillTimer -= dt;
+            if (e.skillTimer <= 0) {
+              e.skillTimer = 4.0;
+              if (e.bType === 'summoner' || e.bType === 'hybrid') {
+                for (let i = 0; i < 3; i++) spawnEnemy('fast');
+                addText(e.x, e.y - 35, '子分召喚！', '#f59e0b');
+              }
+              if (e.bType === 'rusher' || e.bType === 'hybrid') {
+                const trg = alive[0] || { x: WORLD.ovumX, y: WORLD.ovumY };
+                const ra = Math.atan2(trg.y - e.y, trg.x - e.x);
+                e.vx += Math.cos(ra) * 450; e.vy += Math.sin(ra) * 450;
+                AudioEngine.play('bomb');
+                addText(e.x, e.y - 35, '突進！', '#ef4444');
+              }
+            }
+          }
+
+          let tx = WORLD.ovumX, ty = WORLD.ovumY;
+          if (alive.length > 0 && Math.hypot(alive[0].x - e.x, alive[0].y - e.y) < 260) {
+            tx = alive[0].x; ty = alive[0].y;
+          }
+          const tdx = tx - e.x, tdy = ty - e.y, td = Math.hypot(tdx, tdy) || 0.001;
+          e.ang = Math.atan2(tdy, tdx);
+          let sp = e.spd;
+          if (state.acidField && Math.hypot(WORLD.ovumX - e.x, WORLD.ovumY - e.y) < 320) sp *= 0.65;
+
+          e.x += (tdx / td) * sp * dt + e.vx * dt;
+          e.y += (tdy / td) * sp * dt + e.vy * dt;
+          e.vx *= 0.88; e.vy *= 0.88;
+
+          // プレイヤー接触噛みつき攻撃
+          alive.forEach(p => {
+            if (Math.hypot(p.x - e.x, p.y - e.y) < e.rad + 20 && e.atkCd <= 0) {
+              e.atkCd = 0.85;
+              p.hp = Math.max(0, p.hp - e.atk);
+              AudioEngine.play('bite');
+              addText(p.x, p.y - 20, `-${e.atk}`, '#ef4444');
+              if (p.hp <= 0) p.downed = true;
+            }
+          });
+
+          // 卵子接触
+          const dOvum = Math.hypot(WORLD.ovumX - e.x, WORLD.ovumY - e.y);
+          if (state.barrierHp > 0) {
+            if (dOvum <= WORLD.barrierRadius + e.rad) {
+              state.barrierHp = Math.max(0, state.barrierHp - (e.isB ? 25 : 8));
+              addText(e.x, e.y, 'BARRIER HIT', '#ec4899');
+              if (!e.isB) killEnemy(e);
+            }
+          } else if (dOvum <= WORLD.ovumRadius + e.rad) {
+            triggerGameOver();
+          }
+        });
+
+        syncEnemies();
+
+        // ウェーブクリア判定
+        if (state.enemies.length === 0 && (!state.spawnQ || state.spawnQ.length === 0)) {
+          openShop();
+        }
+      } else {
+        // クライアント側自律移動（デッドレコニング）
+        state.enemies.forEach(e => {
+          const tdx = WORLD.ovumX - e.x, tdy = WORLD.ovumY - e.y, td = Math.hypot(tdx, tdy) || 0.001;
+          e.x += (tdx / td) * e.spd * dt;
+          e.y += (tdy / td) * e.spd * dt;
+          if (e.tx !== undefined) {
+            e.x += (e.tx - e.x) * (dt * 12);
+            e.y += (e.ty - e.y) * (dt * 12);
+          }
         });
       }
 
-      state.enemies.forEach(e => {
-        const d = Math.hypot(e.x - bx, e.y - by);
-        if (d <= blastRadius + e.radius) {
-          const ang = Math.atan2(e.y - by, e.x - bx);
-          damageEnemy(e, dmg, kb, Math.cos(ang), Math.sin(ang), isCrit);
-        }
-      });
-    }
-
-    function updateTurrets(dt) {
-      const rateMult = state.teamBuffs.turretRate || 1;
-      state.turrets.forEach(turret => {
-        turret.cooldown = (turret.cooldown || 0) - dt;
-        if (turret.cooldown <= 0 && state.enemies.length > 0) {
-          let target = null, minDist = 320;
-          state.enemies.forEach(e => {
-            const d = Math.hypot(e.x - turret.x, e.y - turret.y);
-            if (d < minDist) { minDist = d; target = e; }
-          });
-          if (target) {
-            turret.cooldown = 0.6 * rateMult;
-            const ang = Math.atan2(target.y - turret.y, target.x - turret.x);
-            AudioEngine.play('gun');
-            spawnProjectile(turret.x, turret.y, ang, 750, 320, 'bullet', 20, 80, false);
-          }
-        }
-      });
-    }
-
-    function updateEffects(dt) {
+      // パーティクル＆テキスト
       for (let i = state.particles.length - 1; i >= 0; i--) {
         const p = state.particles[i];
-        p.x += p.vx * dt;
-        p.y += p.vy * dt;
-        p.life -= dt;
-        if (p.life <= 0) state.particles.splice(i, 1);
+        p.x += p.vx * dt; p.y += p.vy * dt; p.l -= dt;
+        if (p.l <= 0) state.particles.splice(i, 1);
       }
-      for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
-        const ft = state.floatingTexts[i];
-        ft.y -= 25 * dt;
-        ft.life -= dt;
-        if (ft.life <= 0) state.floatingTexts.splice(i, 1);
+      for (let i = state.texts.length - 1; i >= 0; i--) {
+        const t = state.texts[i];
+        t.y -= 25 * dt; t.l -= dt;
+        if (t.l <= 0) state.texts.splice(i, 1);
+      }
+
+      // カメラ追従
+      state.camera.x += (state.localX - state.camera.x) * 0.15;
+      state.camera.y += (state.localY - state.camera.y) * 0.15;
+
+      updateHUD();
+    }
+
+    function explodeBomb(bx, by, dmg, kb) {
+      AudioEngine.play('bomb');
+      for (let i = 0; i < 16; i++) {
+        const a = Math.random() * Math.PI * 2, sp = 60 + Math.random() * 160;
+        state.particles.push({ x: bx, y: by, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, col: '#f97316', l: 0.35, ml: 0.35, s: 5 });
+      }
+      if (state.isHost) {
+        state.enemies.forEach(e => {
+          if (Math.hypot(e.x - bx, e.y - by) <= 150 + e.rad) {
+            const ang = Math.atan2(e.y - by, e.x - bx);
+            hitEnemy(e, dmg, kb, Math.cos(ang), Math.sin(ang));
+          }
+        });
       }
     }
 
-    function updateHUD() {
-      const me = state.players.find(p => p.id === state.myId);
-      if (me) {
-        document.getElementById('hudPlayerName').innerText = me.name + (me.downed ? ' (救助を待て!)' : '');
-        document.getElementById('hudPlayerHpTxt').innerText = `${Math.max(0, Math.round(me.hp))} / ${me.maxHp}`;
-        const pct = Math.max(0, Math.min(100, (me.hp / me.maxHp) * 100));
-        document.getElementById('hudPlayerHpBar').style.width = `${pct}%`;
-        document.getElementById('hudPlayerHpBar').className = `h-full transition-all duration-150 ${me.downed ? 'bg-rose-600 animate-pulse' : (pct < 30 ? 'bg-amber-500' : 'bg-emerald-500')}`;
-      }
-      document.getElementById('hudBarrierHpTxt').innerText = `${Math.round(state.barrierHp)} / ${state.maxBarrierHp}`;
-      const barPct = Math.max(0, Math.min(100, (state.barrierHp / state.maxBarrierHp) * 100));
-      document.getElementById('hudBarrierHpBar').style.width = `${barPct}%`;
-    }
-
-    function updateHudCoins() {
-      document.getElementById('hudCoins').innerText = state.coins;
-      const sc = document.getElementById('shopCoins');
-      if (sc) sc.innerText = state.coins;
-    }
-
-    function triggerGameOver() {
-      state.status = 'GAMEOVER';
-      AudioEngine.play('gameover');
-      document.getElementById('goWaveText').innerText = `WAVE ${state.wave}`;
-      document.getElementById('goCoinsText').innerText = `${state.coins} 🪙`;
-      document.getElementById('screenGameOver').classList.remove('hidden');
-
-      const cvs = document.getElementById('lionGameOverCanvas');
-      if (cvs) {
-        const c = cvs.getContext('2d');
-        c.clearRect(0, 0, 80, 80);
-        drawCircleCroppedImage(c, state.imgMale, 40, 40, 38, '#dc2626', '🦁');
-      }
-
-      broadcastPacket({ t: 'OVER', w: state.wave });
-    }
-
-    function renderGame(dt) {
+    // --- 爆速描画（スタンプ方式＆HUDナビゲーション） ---
+    function render() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
       ctx.save();
       ctx.translate(canvas.width / 2 - state.camera.x, canvas.height / 2 - state.camera.y);
 
-      // 背景 (装飾のみ、重いエフェクトなし)
-      ctx.fillStyle = '#0f172a';
+      // 背景
+      ctx.fillStyle = '#1e1b4b';
       ctx.fillRect(0, 0, WORLD.width, WORLD.height);
 
-      // 強酸スローゾーン
-      if (state.teamBuffs.acidZone) {
+      if (state.acidField) {
         ctx.beginPath();
-        ctx.arc(WORLD.ovumX, WORLD.ovumY, 260, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(132, 204, 22, 0.1)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(132, 204, 22, 0.35)';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        ctx.arc(WORLD.ovumX, WORLD.ovumY, 320, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.08)'; ctx.fill();
+        ctx.strokeStyle = 'rgba(16, 185, 129, 0.25)'; ctx.lineWidth = 3; ctx.stroke();
       }
 
       // タレット
       state.turrets.forEach(t => {
-        ctx.beginPath();
-        ctx.arc(t.x, t.y, 14, 0, Math.PI * 2);
-        ctx.fillStyle = '#38bdf8';
-        ctx.fill();
-        ctx.strokeStyle = '#0284c7';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        ctx.beginPath(); ctx.arc(t.x, t.y, 14, 0, Math.PI * 2);
+        ctx.fillStyle = '#38bdf8'; ctx.fill();
+        ctx.strokeStyle = '#0284c7'; ctx.lineWidth = 2.5; ctx.stroke();
       });
 
-      // 卵子 & 透明帯膜 (shadowBlur廃止で超軽量化)
-      const ox = WORLD.ovumX, oy = WORLD.ovumY;
+      // バリア
       if (state.barrierHp > 0) {
         ctx.beginPath();
-        ctx.arc(ox, oy, WORLD.barrierRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(244, 63, 94, 0.8)';
-        ctx.lineWidth = 6;
-        ctx.stroke();
+        ctx.arc(WORLD.ovumX, WORLD.ovumY, WORLD.barrierRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = '#f43f5e'; ctx.lineWidth = 6; ctx.stroke();
       }
 
-      drawCircleCroppedImage(ctx, state.imgFemale, ox, oy, WORLD.ovumRadius, '#f43f5e', '👑');
+      // 卵子（スタンプ事前描画）
+      if (ImageStamp.femaleStamp) {
+        const r = WORLD.ovumRadius;
+        ctx.drawImage(ImageStamp.femaleStamp, WORLD.ovumX - r, WORLD.ovumY - r, r * 2, r * 2);
+      }
 
-      // 敵 (精子) - クライアント側Lerp補間で60FPSヌルヌル化
-      const lerpSpeed = Math.min(1.0, dt * 14);
+      // 敵（精子）
+      const now = performance.now();
       state.enemies.forEach(e => {
-        if (!state.isHost && e.tx !== undefined) {
-          e.x += (e.tx - e.x) * lerpSpeed;
-          e.y += (e.ty - e.y) * lerpSpeed;
-          let diff = e.tang - e.facingAngle;
-          while (diff > Math.PI) diff -= Math.PI * 2;
-          while (diff < -Math.PI) diff += Math.PI * 2;
-          e.facingAngle += diff * lerpSpeed;
-        }
-
-        ctx.save();
-        ctx.translate(e.x, e.y);
-        ctx.rotate(e.facingAngle);
-
-        const tailLen = e.isBoss ? 70 : 40;
-        const wiggleSpeed = e.isBoss ? 0.012 : 0.018;
-        const seed = e.tailPhase || 0;
+        const tailLen = e.isB ? 60 : 35;
+        const tx = e.x - Math.cos(e.ang) * (e.rad + tailLen);
+        const ty = e.y - Math.sin(e.ang) * (e.rad + tailLen);
+        const wiggle = Math.sin(now * 0.015) * (e.isB ? 14 : 7);
 
         ctx.beginPath();
-        ctx.moveTo(-e.radius * 0.8, 0);
+        ctx.moveTo(e.x - Math.cos(e.ang) * e.rad, e.y - Math.sin(e.ang) * e.rad);
+        ctx.quadraticCurveTo(
+          (e.x + tx) / 2 + Math.sin(e.ang) * wiggle,
+          (e.y + ty) / 2 - Math.cos(e.ang) * wiggle,
+          tx, ty
+        );
+        ctx.strokeStyle = e.isB ? '#fbbf24' : '#cbd5e1';
+        ctx.lineWidth = e.isB ? 5 : 3;
+        ctx.stroke();
 
-        const segments = 4;
-        for (let i = 1; i <= segments; i++) {
-          const t = i / segments;
-          const segX = -e.radius * 0.8 - t * tailLen;
-          const segY = Math.sin(Date.now() * wiggleSpeed + seed - t * 2.8) * (t * (e.isBoss ? 20 : 12));
-          ctx.lineTo(segX, segY);
+        if (ImageStamp.maleStamp) {
+          ctx.drawImage(ImageStamp.maleStamp, e.x - e.rad, e.y - e.rad, e.rad * 2, e.rad * 2);
         }
 
-        ctx.lineWidth = e.isBoss ? 5 : 3;
-        ctx.strokeStyle = e.isBoss ? '#fbbf24' : '#e2e8f0';
-        ctx.lineCap = 'round';
-        ctx.stroke();
-        ctx.restore();
-
-        drawCircleCroppedImage(ctx, state.imgMale, e.x, e.y, e.radius, e.isBoss ? '#f59e0b' : '#f8fafc', '🦁');
-
         if (e.hp < e.maxHp) {
-          const barW = Math.max(30, e.radius * 2);
-          const barH = 4;
-          ctx.fillStyle = '#334155';
-          ctx.fillRect(e.x - barW / 2, e.y - e.radius - 10, barW, barH);
-          ctx.fillStyle = e.isBoss ? '#f59e0b' : '#ef4444';
-          ctx.fillRect(e.x - barW / 2, e.y - e.radius - 10, barW * Math.max(0, e.hp / e.maxHp), barH);
+          const bw = e.rad * 2, bh = 4;
+          ctx.fillStyle = '#334155'; ctx.fillRect(e.x - e.rad, e.y - e.rad - 8, bw, bh);
+          ctx.fillStyle = e.isB ? '#f59e0b' : '#ef4444';
+          ctx.fillRect(e.x - e.rad, e.y - e.rad - 8, bw * Math.max(0, e.hp / e.maxHp), bh);
         }
       });
 
       // 弾丸
       state.projectiles.forEach(p => {
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.angle);
-        if (p.type === 'bomb') {
-          ctx.beginPath();
-          ctx.arc(0, 0, 7, 0, Math.PI * 2);
-          ctx.fillStyle = '#1e293b';
-          ctx.fill();
-          ctx.fillStyle = p.isCrit ? '#facc15' : '#f97316';
-          ctx.fillRect(1, -2.5, 5, 5);
-        } else if (p.type === 'bullet') {
-          ctx.fillStyle = p.isCrit ? '#facc15' : '#fbbf24';
-          ctx.fillRect(-5, -2, 10, 4);
-        } else if (p.type === 'magic') {
-          ctx.beginPath();
-          ctx.arc(0, 0, 6, 0, Math.PI * 2);
-          ctx.fillStyle = p.isCrit ? '#facc15' : '#a855f7';
-          ctx.fill();
-        }
-        ctx.restore();
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.type === 'bomb' ? 7 : 4, 0, Math.PI * 2);
+        ctx.fillStyle = p.type === 'bomb' ? '#f97316' : (p.type === 'magic' ? '#c084fc' : '#facc15');
+        ctx.fill();
       });
 
-      // プレイヤー (他プレイヤーのLerp補間)
+      // プレイヤー
       state.players.forEach(p => {
         const isMe = (p.id === state.myId);
-        if (!isMe && p.tx !== undefined) {
-          p.x += (p.tx - p.x) * lerpSpeed;
-          p.y += (p.ty - p.y) * lerpSpeed;
-          let diff = p.tang - p.aimAngle;
-          while (diff > Math.PI) diff -= Math.PI * 2;
-          while (diff < -Math.PI) diff += Math.PI * 2;
-          p.aimAngle += diff * lerpSpeed;
-        }
-
         ctx.save();
         ctx.translate(p.x, p.y);
 
+        // 武器
         ctx.save();
-        ctx.rotate(p.aimAngle || 0);
+        ctx.rotate(p.ang || 0);
         ctx.fillStyle = '#64748b';
-        ctx.fillRect(13, -2.5, 14, 5);
+        ctx.fillRect(12, -3, 14, 6);
         ctx.restore();
 
-        ctx.beginPath();
-        ctx.arc(0, 0, 17, 0, Math.PI * 2);
+        ctx.beginPath(); ctx.arc(0, 0, 17, 0, Math.PI * 2);
         ctx.fillStyle = p.downed ? '#dc2626' : (isMe ? '#10b981' : '#3b82f6');
         ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2; ctx.stroke();
 
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(p.name, 0, -23);
+        ctx.fillStyle = '#ffffff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(p.name, 0, -24);
 
         if (p.downed) {
-          ctx.fillStyle = '#ef4444';
-          ctx.font = 'bold 11px sans-serif';
+          ctx.fillStyle = '#ef4444'; ctx.font = 'bold 11px sans-serif';
           ctx.fillText('SOS!', 0, 4);
+          if (isMe && state.localReviveProgress > 0) {
+            ctx.strokeStyle = '#10b981'; ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(0, 0, 22, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * state.localReviveProgress);
+            ctx.stroke();
+          }
         }
-
         ctx.restore();
       });
 
-      // パーティクル & フローティングテキスト
+      // パーティクル＆テキスト
       state.particles.forEach(p => {
-        ctx.fillStyle = p.color;
-        ctx.globalAlpha = Math.max(0, p.life / p.maxLife);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.fillStyle = p.col;
+        ctx.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s);
       });
-      ctx.globalAlpha = 1.0;
-
-      state.floatingTexts.forEach(ft => {
-        ctx.font = 'bold 13px sans-serif';
-        ctx.fillStyle = ft.color;
-        ctx.textAlign = 'center';
-        ctx.fillText(ft.text, ft.x, ft.y);
+      state.texts.forEach(t => {
+        ctx.fillStyle = t.col; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(t.txt, t.x, t.y);
       });
 
       ctx.restore();
 
-      drawDirectionalPointers();
+      // ナビゲーションHUD（完全復元）
+      drawPointer(WORLD.ovumX, WORLD.ovumY, '#f43f5e', '👑 卵子');
+      const boss = state.enemies.find(e => e.isB);
+      if (boss) drawPointer(boss.x, boss.y, '#f59e0b', '⚠️ BOSS');
+      state.players.filter(p => p.id !== state.myId && p.downed).forEach(p => {
+        drawPointer(p.x, p.y, '#ef4444', '🚨 救助');
+      });
     }
 
-    function drawDirectionalPointers() {
-      drawPointerToWorldTarget(WORLD.ovumX, WORLD.ovumY, '#f43f5e');
-      const boss = state.enemies.find(e => e.isBoss);
-      if (boss) drawPointerToWorldTarget(boss.x, boss.y, '#f59e0b');
-    }
-
-    function drawPointerToWorldTarget(tx, ty, color) {
+    function drawPointer(tx, ty, color, label) {
       const sx = canvas.width / 2 + (tx - state.camera.x);
       const sy = canvas.height / 2 + (ty - state.camera.y);
-      if (sx >= 50 && sx <= canvas.width - 50 && sy >= 50 && sy <= canvas.height - 50) return;
+      if (sx >= 40 && sx <= canvas.width - 40 && sy >= 40 && sy <= canvas.height - 40) return;
 
       const ang = Math.atan2(sy - canvas.height / 2, sx - canvas.width / 2);
       const edgeDist = Math.min(canvas.width / 2 - 35, canvas.height / 2 - 35);
       const px = canvas.width / 2 + Math.cos(ang) * edgeDist;
       const py = canvas.height / 2 + Math.sin(ang) * edgeDist;
 
-      ctx.save();
-      ctx.translate(px, py);
-      ctx.rotate(ang);
-      ctx.beginPath();
-      ctx.moveTo(10, 0);
-      ctx.lineTo(-7, -8);
-      ctx.lineTo(-7, 8);
-      ctx.closePath();
-      ctx.fillStyle = color;
-      ctx.fill();
+      ctx.save(); ctx.translate(px, py); ctx.rotate(ang);
+      ctx.beginPath(); ctx.moveTo(12, 0); ctx.lineTo(-8, -8); ctx.lineTo(-8, 8); ctx.closePath();
+      ctx.fillStyle = color; ctx.fill();
       ctx.restore();
     }
 
-    const BROKER_URL = 'wss://broker.hivemq.com:8884/mqtt';
-    const TOPIC_PREFIX = 'sdf_shikyuu_room_v4/';
+    function updateHUD() {
+      const me = state.players.find(p => p.id === state.myId);
+      if (me) {
+        document.getElementById('hudPlayerName').innerText = me.name + (me.downed ? ' (SOS!)' : '');
+        document.getElementById('hudPlayerHpTxt').innerText = `${Math.max(0, Math.round(me.hp))} / ${me.maxHp}`;
+        document.getElementById('hudPlayerHpBar').style.width = `${Math.max(0, (me.hp / me.maxHp) * 100)}%`;
+      }
+      document.getElementById('hudBarrierHpTxt').innerText = `${state.barrierHp} / ${state.maxBarrierHp}`;
+      document.getElementById('hudBarrierHpBar').style.width = `${Math.max(0, (state.barrierHp / state.maxBarrierHp) * 100)}%`;
+    }
+    function updateHudCoins() {
+      document.getElementById('hudCoins').innerText = state.coins;
+      const sc = document.getElementById('shopCoins');
+      if (sc) sc.innerText = state.coins;
+    }
 
-    function initMqtt() {
-      if (state.mqttClient) return;
+    // --- 前線ショップ (16種完全反映) ---
+    function openShop() {
+      state.status = 'SHOP';
+      state.readySet.clear();
+      // 全員全快復活！
+      state.players.forEach(p => { p.downed = false; p.hp = p.maxHp; });
+      AudioEngine.play('fanfare');
+      showToast('🎉 ウェーブクリア！部隊全員全快復活！', 'bg-emerald-600');
+      document.getElementById('modalWaveShop').classList.remove('hidden');
+      document.getElementById('btnReadyShop').classList.remove('opacity-50', 'bg-slate-700');
+      document.getElementById('btnReadyShop').classList.add('bg-emerald-600');
+      document.getElementById('btnReadyShop').innerText = '準備完了 (次へ進む)';
 
-      const netEl = document.getElementById('lobbyNetStatus');
-      if (netEl) {
-        netEl.innerHTML = `<span class="inline-block w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span><span>接続試行中...</span>`;
-        netEl.className = 'font-bold flex items-center gap-1.5 text-amber-400';
+      updateHudCoins();
+      renderShop();
+      updateReadyUI();
+      if (state.isHost) send({ t: 'OPEN_SHOP' });
+    }
+
+    function renderShop() {
+      const c = document.getElementById('shopItemList');
+      c.innerHTML = '';
+      SHOP_ITEMS_16.forEach(it => {
+        const d = document.createElement('div');
+        d.className = 'flex justify-between items-center bg-slate-800 p-2.5 rounded-xl border border-slate-700';
+        d.innerHTML = `
+          <div class="pr-2">
+            <div class="text-xs font-bold text-amber-300">${it.name}</div>
+            <div class="text-[10px] text-slate-400">${it.desc}</div>
+          </div>
+          <button class="shrink-0 comic-btn bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-3 py-1.5 rounded-lg border border-yellow-300">${it.cost}🪙</button>
+        `;
+        d.querySelector('button').onclick = () => buyShop(it);
+        c.appendChild(d);
+      });
+    }
+
+    function buyShop(it) {
+      if (state.coins < it.cost) { showToast('コイン不足！'); return; }
+      state.coins -= it.cost; saveStorage(); updateHudCoins(); AudioEngine.play('coin');
+
+      const me = state.players.find(p => p.id === state.myId);
+      if (it.id === 'heal_self' && me) me.hp = Math.min(me.maxHp, me.hp + 60);
+      if (it.id === 'max_hp_up' && me) { me.maxHp += 25; me.hp = me.maxHp; }
+      if (it.id === 'atk_up') state.shopBuffs.atk += 0.18;
+      if (it.id === 'spd_up') state.shopBuffs.spd += 0.12;
+      if (it.id === 'cd_down') state.shopBuffs.cd = Math.max(0.4, state.shopBuffs.cd - 0.12);
+      if (it.id === 'range_up') state.shopBuffs.rng += 0.20;
+      if (it.id === 'kb_up') state.shopBuffs.kb += 0.35;
+      if (it.id === 'coin_up') state.shopBuffs.coin += 0.25;
+      if (it.id === 'regen') state.shopBuffs.regen += 2;
+      if (it.id === 'crit') state.shopBuffs.crit = Math.min(0.6, state.shopBuffs.crit + 0.15);
+
+      if (it.id === 'repair_barrier') {
+        state.barrierHp = Math.min(state.maxBarrierHp, state.barrierHp + 35);
+        send({ t: 'SYNC_BAR', hp: state.barrierHp, max: state.maxBarrierHp });
+      }
+      if (it.id === 'barrier_max_up') {
+        state.maxBarrierHp += 30; state.barrierHp = state.maxBarrierHp;
+        send({ t: 'SYNC_BAR', hp: state.barrierHp, max: state.maxBarrierHp });
+      }
+      if (it.id === 'turret') {
+        state.turrets.push({ x: WORLD.ovumX + 150, y: WORLD.ovumY, cd: 0 });
+        send({ t: 'SYNC_TURRET' });
+      }
+      if (it.id === 'turret_speed') {
+        state.turretRate *= 1.3;
+        send({ t: 'SYNC_TURRET_RATE', rate: state.turretRate });
+      }
+      if (it.id === 'acid_field') {
+        state.acidField = true;
+        send({ t: 'SYNC_ACID' });
+      }
+      if (it.id === 'team_buff') {
+        state.shopBuffs.atk += 0.12; state.shopBuffs.spd += 0.08;
+        send({ t: 'SYNC_TEAM_BUFF' });
       }
 
-      state.mqttClient = mqtt.connect(BROKER_URL, {
-        clientId: 'sdf_' + state.myId + '_' + Date.now().toString(36),
-        keepalive: 60,
-        reconnectPeriod: 2500,
-        connectTimeout: 8000
+      showToast(`${it.name} を購入！`, 'bg-emerald-600');
+    }
+
+    document.getElementById('btnReadyShop').onclick = () => {
+      state.readySet.add(state.myId);
+      const b = document.getElementById('btnReadyShop');
+      b.classList.add('opacity-50', 'bg-slate-700');
+      b.classList.remove('bg-emerald-600');
+      b.innerText = '他の隊員を待機中...';
+      send({ t: 'READY', id: state.myId });
+      checkReady();
+    };
+
+    function updateReadyUI() {
+      document.getElementById('shopReadyCount').innerText = `${state.readySet.size} / ${state.players.length} 人`;
+    }
+
+    function checkReady() {
+      updateReadyUI();
+      if (state.isHost && state.readySet.size >= state.players.length) {
+        document.getElementById('modalWaveShop').classList.add('hidden');
+        send({ t: 'NEXT_WAVE', w: state.wave + 1 });
+        startWave(state.wave + 1);
+      }
+    }
+
+    function triggerGameOver() {
+      state.status = 'GAMEOVER';
+      AudioEngine.play('punch');
+      document.getElementById('goWaveText').innerText = `WAVE ${state.wave}`;
+      document.getElementById('goCoinsText').innerText = `${state.coins} 🪙`;
+      document.getElementById('screenGameOver').classList.remove('hidden');
+      send({ t: 'GAMEOVER', w: state.wave });
+    }
+    document.getElementById('btnRestartFromOver').onclick = () => location.reload();
+
+    // --- MQTT通信 (HiveMQ WebSocket) ---
+    const BROKER = 'wss://broker.hivemq.com:8884/mqtt';
+    const PREFIX = 'sdf_fast_room_v5/';
+
+    function initNetwork(cb) {
+      if (state.mqtt) { if (state.mqttOk && cb) cb(); return; }
+      state.mqtt = mqtt.connect(BROKER, { clientId: 'c_' + state.myId + '_' + Date.now(), keepalive: 40 });
+      state.mqtt.on('connect', () => {
+        state.mqttOk = true;
+        state.mqtt.subscribe(PREFIX + state.roomCode, { qos: 0 }, () => { if (cb) cb(); });
       });
-
-      state.mqttClient.on('connect', () => {
-        state.mqttConnected = true;
-        const netEl = document.getElementById('lobbyNetStatus');
-        if (netEl) {
-          netEl.innerHTML = `<span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400"></span><span>ブローカー接続完了</span>`;
-          netEl.className = 'font-bold flex items-center gap-1.5 text-emerald-400';
-        }
-
-        if (state.roomCode) {
-          state.mqttClient.subscribe(TOPIC_PREFIX + state.roomCode, { qos: 0 }, () => {
-            if (!state.isHost) {
-              // 参加をアナウンス
-              broadcastPacket({ t: 'JOIN', n: state.myName, c: state.selectedChar });
-            }
-          });
-        }
-      });
-
-      state.mqttClient.on('error', () => {
-        const netEl = document.getElementById('lobbyNetStatus');
-        if (netEl) {
-          netEl.innerHTML = `<span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500"></span><span>接続再試行中</span>`;
-          netEl.className = 'font-bold flex items-center gap-1.5 text-rose-400';
-        }
-      });
-
-      state.mqttClient.on('message', (topic, payload) => {
+      state.mqtt.on('message', (t, p) => {
         try {
-          const msg = JSON.parse(payload.toString());
-          if (msg.s === state.myId) return; // 自分のパケットは除外
-          handleIncomingMessage(msg);
+          const m = JSON.parse(p.toString());
+          if (m.sId === state.myId) return;
+          recv(m);
         } catch (e) {}
       });
     }
 
-    function broadcastPacket(data) {
-      if (state.isOffline || !state.mqttClient || !state.mqttConnected) return;
-      data.s = state.myId;
-      try {
-        state.mqttClient.publish(TOPIC_PREFIX + state.roomCode, JSON.stringify(data), { qos: 0 });
-      } catch (e) {}
+    function send(data) {
+      if (state.isOffline || !state.mqttOk) return;
+      data.sId = state.myId;
+      state.mqtt.publish(PREFIX + state.roomCode, JSON.stringify(data));
     }
 
-    // 10Hz (100ms) スロットリング - 帯域を極力削減
-    let lastPlayerSyncTime = 0;
-    function throttledSyncLocalPlayer() {
+    let lastSyncP = 0;
+    function syncPlayer() {
       const now = performance.now();
-      if (now - lastPlayerSyncTime < 100) return;
-      lastPlayerSyncTime = now;
-      broadcastPacket({
-        t: 'P_SYNC',
-        x: Math.round(state.localX),
-        y: Math.round(state.localY),
-        a: Math.round(state.localAimAngle * 100) / 100
-      });
+      if (now - lastSyncP < 90) return;
+      lastSyncP = now;
+      send({ t: 'P', x: Math.round(state.localX), y: Math.round(state.localY), a: Math.round(state.localAim * 100) / 100 });
     }
 
-    // 8Hz (125ms) ホスト同期 - 敵データの軽量タプル化
-    let lastHostSyncTime = 0;
-    function throttledSyncHostEnemies() {
+    let lastSyncE = 0;
+    function syncEnemies() {
       const now = performance.now();
-      if (now - lastHostSyncTime < 125) return;
-      lastHostSyncTime = now;
-      broadcastHostState();
+      if (now - lastSyncE < 120) return;
+      lastSyncE = now;
+      const simple = state.enemies.map(e => [e.id, Math.round(e.x), Math.round(e.y), e.hp, e.maxHp, e.rad, Math.round(e.ang * 100) / 100, e.isB ? 1 : 0]);
+      send({ t: 'E', list: simple, bar: state.barrierHp, w: state.wave });
     }
 
-    function broadcastHostState() {
-      if (!state.isHost) return;
-      // 超軽量タプル配列: [id, x, y, hp, maxHp, rad, ang, isBoss]
-      const simpleEnemies = state.enemies.map(e => [
-        e.id,
-        Math.round(e.x),
-        Math.round(e.y),
-        e.hp,
-        e.maxHp,
-        e.radius,
-        Math.round(e.facingAngle * 100) / 100,
-        e.isBoss ? 1 : 0
-      ]);
-
-      broadcastPacket({
-        t: 'H_SYNC',
-        w: state.wave,
-        b: state.barrierHp,
-        e: simpleEnemies
-      });
-    }
-
-    function handleIncomingMessage(msg) {
-      switch (msg.t) {
+    function recv(m) {
+      switch (m.t) {
         case 'JOIN':
-          if (state.isHost) {
-            let p = state.players.find(item => item.id === msg.s);
-            if (!p) {
-              p = {
-                id: msg.s,
-                name: msg.n,
-                charId: msg.c,
-                x: WORLD.ovumX,
-                y: WORLD.ovumY - 140,
-                hp: 100,
-                maxHp: 100,
-                downed: false
-              };
-              state.players.push(p);
-              showToast(`${msg.n} が着任しました！`, 'success');
-              renderLobbyMembers();
-            }
-            // 全員へメンバー一覧をブロードキャスト
-            broadcastRoster();
+          if (!state.players.some(p => p.id === m.sId)) {
+            state.players.push({ id: m.sId, name: m.name, x: WORLD.ovumX, y: WORLD.ovumY - 140, hp: 100, maxHp: 100, downed: false });
+            renderLobby();
           }
+          if (state.isHost) send({ t: 'ROSTER', list: state.players });
           break;
-
         case 'ROSTER':
+          if (!state.isHost) { state.players = m.list; renderLobby(); }
+          break;
+        case 'START_COUNT':
+          runCountdown();
+          break;
+        case 'P':
+          const pl = state.players.find(p => p.id === m.sId);
+          if (pl) { pl.x = m.x; pl.y = m.y; pl.ang = m.a; }
+          break;
+        case 'E':
           if (!state.isHost) {
-            state.players = msg.p.map(item => ({
-              id: item[0],
-              name: item[1],
-              charId: item[2],
-              x: item[3],
-              y: item[4],
-              hp: item[5],
-              maxHp: item[6],
-              downed: item[7] === 1,
-              tx: item[3],
-              ty: item[4],
-              aimAngle: 0,
-              tang: 0
-            }));
-            renderLobbyMembers();
-          }
-          break;
-
-        case 'START_CD':
-          startCountdownSequence();
-          break;
-
-        case 'P_SYNC':
-          const targetP = state.players.find(p => p.id === msg.s);
-          if (targetP) {
-            targetP.tx = msg.x;
-            targetP.ty = msg.y;
-            targetP.tang = msg.a;
-          }
-          break;
-
-        case 'H_SYNC':
-          if (!state.isHost) {
-            state.wave = msg.w;
-            state.barrierHp = msg.b;
-
-            // 受信した軽量タプルから敵リストを更新・補間
-            const newEnemies = [];
-            msg.e.forEach(arr => {
-              const [id, x, y, hp, maxHp, rad, ang, isB] = arr;
-              let existing = state.enemies.find(item => item.id === id);
-              if (existing) {
-                existing.tx = x;
-                existing.ty = y;
-                existing.hp = hp;
-                existing.maxHp = maxHp;
-                existing.tang = ang;
-                newEnemies.push(existing);
+            state.barrierHp = m.bar; state.wave = m.w;
+            const inIds = new Set();
+            m.list.forEach(row => {
+              const [id, x, y, hp, maxHp, rad, ang, isB] = row;
+              inIds.add(id);
+              let exist = state.enemies.find(e => e.id === id);
+              if (!exist) {
+                exist = { id, x, y, tx: x, ty: y, hp, maxHp, rad, ang, isB: isB === 1, spd: 90 };
+                state.enemies.push(exist);
               } else {
-                newEnemies.push({
-                  id: id,
-                  x: x,
-                  y: y,
-                  tx: x,
-                  ty: y,
-                  hp: hp,
-                  maxHp: maxHp,
-                  radius: rad,
-                  facingAngle: ang,
-                  tang: ang,
-                  isBoss: isB === 1,
-                  tailPhase: 0
-                });
+                exist.tx = x; exist.ty = y; exist.hp = hp; exist.ang = ang;
               }
             });
-            state.enemies = newEnemies;
+            state.enemies = state.enemies.filter(e => inIds.has(e.id));
           }
           break;
-
-        case 'M_HIT':
-          if (state.isHost) {
-            applyMeleeDamage(msg.p[0], msg.p[1], msg.a, msg.r, msg.s, msg.d, msg.k, msg.c === 1);
-          }
+        case 'ATK_MELEE':
+          if (state.isHost) applyMelee(m.x, m.y, m.ang, m.rng, m.dmg, m.kb, m.cId);
           break;
-
-        case 'W_REVIVE':
-          executeWaveClearRevive();
-          break;
-
-        case 'O_SHOP':
-          if (!state.isHost) openWaveShop();
-          break;
-
-        case 'READY':
-          if (msg.r === 1) state.readyPlayerIds.add(msg.p);
-          else state.readyPlayerIds.delete(msg.p);
-          updateReadyIndicator();
-          if (state.isHost) checkAllReadyConsensus();
-          break;
-
-        case 'G_ITEM':
-          applyPurchasedItem(msg.id, msg.s);
-          break;
-
-        case 'ADVANCE':
-          document.getElementById('modalWaveShop').classList.add('hidden');
-          startWave(state.wave + 1);
-          break;
-
         case 'REVIVE':
-          const revivedP = state.players.find(p => p.id === msg.id);
-          if (revivedP) {
-            revivedP.downed = false;
-            revivedP.hp = Math.floor(revivedP.maxHp * 0.5);
+          const rp = state.players.find(p => p.id === m.id);
+          if (rp) { rp.downed = false; rp.hp = Math.floor(rp.maxHp * 0.5); }
+          break;
+        case 'OPEN_SHOP':
+          openShop();
+          break;
+        case 'READY':
+          state.readySet.add(m.id);
+          checkReady();
+          break;
+        case 'NEXT_WAVE':
+          if (!state.isHost) {
+            document.getElementById('modalWaveShop').classList.add('hidden');
+            startWave(m.w);
           }
           break;
-
-        case 'OVER':
+        case 'SYNC_BAR':
+          state.barrierHp = m.hp;
+          if (m.max) state.maxBarrierHp = m.max;
+          break;
+        case 'SYNC_TURRET':
+          state.turrets.push({ x: WORLD.ovumX + 150, y: WORLD.ovumY, cd: 0 });
+          break;
+        case 'SYNC_TURRET_RATE':
+          state.turretRate = m.rate;
+          break;
+        case 'SYNC_ACID':
+          state.acidField = true;
+          break;
+        case 'SYNC_TEAM_BUFF':
+          state.shopBuffs.atk += 0.12; state.shopBuffs.spd += 0.08;
+          showToast('味方が部隊強化を購入しました！', 'bg-amber-600');
+          break;
+        case 'GAMEOVER':
           if (state.status !== 'GAMEOVER') triggerGameOver();
           break;
       }
     }
 
-    function broadcastRoster() {
-      if (!state.isHost) return;
-      const rosterData = state.players.map(p => [
-        p.id, p.name, p.charId, Math.round(p.x), Math.round(p.y), p.hp, p.maxHp, p.downed ? 1 : 0
-      ]);
-      broadcastPacket({ t: 'ROSTER', p: rosterData });
-    }
-
-    // ホスト定期ロビー同期待機
-    setInterval(() => {
-      if (state.isHost && state.status === 'LOBBY') {
-        broadcastRoster();
-      }
-    }, 1500);
-
-    function copyTextToClipboard(text, successMsg) {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(() => {
-          showToast(successMsg, 'success');
-        }).catch(() => fallbackCopy(text, successMsg));
-      } else {
-        fallbackCopy(text, successMsg);
-      }
-    }
-
-    function fallbackCopy(text, successMsg) {
-      const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand('copy');
-        showToast(successMsg, 'success');
-      } catch (e) {
-        showToast('コピーに失敗しました', 'error');
-      }
-      document.body.removeChild(ta);
-    }
-
-    document.getElementById('btnCopyRoomCode').onclick = () => {
-      copyTextToClipboard(state.roomCode, `ルームコード [${state.roomCode}] をコピーしました！`);
-    };
-
-    document.getElementById('btnCopyInviteUrl').onclick = () => {
-      const url = `${location.origin}${location.pathname}#${state.roomCode}`;
-      copyTextToClipboard(url, '招待URLをコピーしました！');
-    };
-
-    const screenTitle = document.getElementById('screenTitle');
-    const screenLobby = document.getElementById('screenLobby');
-    const modalJoin = document.getElementById('modalJoin');
-    const inputPlayerName = document.getElementById('inputPlayerName');
-
+    // --- ロビー＆画面遷移 ---
     document.getElementById('btnCreateRoom').onclick = () => {
-      state.myName = inputPlayerName.value.trim() || '防衛兵01';
+      state.myName = document.getElementById('inputPlayerName').value.trim() || '隊員01';
       state.roomCode = Math.floor(100000 + Math.random() * 900000).toString();
       state.isHost = true;
-      state.isOffline = false;
-
-      // 即時画面遷移
-      enterLobby();
-      initMqtt();
+      initNetwork(() => { enterLobby(); });
     };
-
-    document.getElementById('btnOpenJoin').onclick = () => {
-      modalJoin.classList.remove('hidden');
-    };
-    document.getElementById('btnCancelJoin').onclick = () => {
-      modalJoin.classList.add('hidden');
-    };
+    document.getElementById('btnOpenJoin').onclick = () => document.getElementById('modalJoin').classList.remove('hidden');
+    document.getElementById('btnCancelJoin').onclick = () => document.getElementById('modalJoin').classList.add('hidden');
     document.getElementById('btnConfirmJoin').onclick = () => {
       const code = document.getElementById('inputJoinCode').value.trim().toUpperCase();
-      if (code.length < 4) {
-        showToast('ルームコードを入力してください', 'warn');
-        return;
-      }
-      modalJoin.classList.add('hidden');
-      state.myName = inputPlayerName.value.trim() || '防衛兵01';
+      if (!code) return;
+      document.getElementById('modalJoin').classList.add('hidden');
+      state.myName = document.getElementById('inputPlayerName').value.trim() || '隊員01';
       state.roomCode = code;
       state.isHost = false;
-      state.isOffline = false;
-
-      // 即時画面遷移
-      enterLobby();
-      initMqtt();
+      initNetwork(() => {
+        enterLobby();
+        send({ t: 'JOIN', name: state.myName });
+      });
     };
-
     document.getElementById('btnSoloPlay').onclick = () => {
-      state.myName = inputPlayerName.value.trim() || 'ソロ防衛兵';
-      state.isHost = true;
-      state.isOffline = true;
-      state.players = [{
-        id: state.myId,
-        name: state.myName,
-        charId: state.selectedChar,
-        x: WORLD.ovumX,
-        y: WORLD.ovumY - 140,
-        hp: 100,
-        maxHp: 100,
-        downed: false
-      }];
-      screenTitle.classList.add('hidden');
+      state.myName = 'ソロ隊員'; state.isHost = true; state.isOffline = true;
+      state.players = [{ id: state.myId, name: state.myName, x: WORLD.ovumX, y: WORLD.ovumY - 140, hp: 100, maxHp: 100, downed: false }];
+      document.getElementById('screenTitle').classList.add('hidden');
       document.getElementById('hudTop').classList.remove('hidden');
       document.getElementById('hudPlayerHp').classList.remove('hidden');
       startWave(1);
@@ -2235,79 +1364,54 @@
 
     function enterLobby() {
       state.status = 'LOBBY';
-      screenTitle.classList.add('hidden');
-      screenLobby.classList.remove('hidden');
+      document.getElementById('screenTitle').classList.add('hidden');
+      document.getElementById('screenLobby').classList.remove('hidden');
       document.getElementById('lobbyRoomCode').innerText = state.roomCode;
-
-      state.players = [{
-        id: state.myId,
-        name: state.myName,
-        charId: state.selectedChar,
-        x: WORLD.ovumX,
-        y: WORLD.ovumY - 140,
-        hp: 100,
-        maxHp: 100,
-        downed: false
-      }];
-
+      state.players = [{ id: state.myId, name: state.myName, x: WORLD.ovumX, y: WORLD.ovumY - 140, hp: 100, maxHp: 100, downed: false }];
       if (state.isHost) {
         document.getElementById('btnHostStart').classList.remove('hidden');
         document.getElementById('guestWaitingNotice').classList.add('hidden');
-      } else {
-        document.getElementById('btnHostStart').classList.add('hidden');
-        document.getElementById('guestWaitingNotice').classList.remove('hidden');
       }
-
-      renderLobbyMembers();
+      renderLobby();
     }
 
-    function renderLobbyMembers() {
-      const list = document.getElementById('lobbyMemberList');
-      list.innerHTML = '';
+    function renderLobby() {
+      const el = document.getElementById('lobbyMemberList');
+      el.innerHTML = '';
       document.getElementById('lobbyMemberCount').innerText = `${state.players.length} / 8`;
       state.players.forEach(p => {
-        const row = document.createElement('div');
-        row.className = 'flex justify-between items-center bg-slate-800 px-3.5 py-2 rounded-xl text-xs font-bold text-white';
-        const isSelf = (p.id === state.myId);
-        row.innerHTML = `
-          <div class="flex items-center space-x-2">
-            <span>${isSelf ? '🟢' : '🔵'}</span>
-            <span>${p.name}</span>
-          </div>
-          <span class="text-rose-400 font-mono">${CHARACTERS.find(c => c.id === p.charId)?.name || '素手兵'}</span>
-        `;
-        list.appendChild(row);
+        const d = document.createElement('div');
+        d.className = 'flex justify-between bg-slate-800 px-3 py-2 rounded-xl text-xs font-bold text-white';
+        d.innerHTML = `<span>🟢 ${p.name} ${p.id === state.players[0]?.id ? '👑' : ''}</span><span class="text-rose-400">出撃待機</span>`;
+        el.appendChild(d);
       });
     }
 
+    document.getElementById('btnCopyCode').onclick = () => {
+      navigator.clipboard.writeText(state.roomCode).then(() => showToast('コードコピー完了！', 'bg-emerald-600'));
+    };
+    document.getElementById('btnCopyUrl').onclick = () => {
+      navigator.clipboard.writeText(`${location.origin}${location.pathname}#${state.roomCode}`).then(() => showToast('招待URLコピー完了！', 'bg-emerald-600'));
+    };
     document.getElementById('btnLeaveLobby').onclick = () => location.reload();
 
     document.getElementById('btnHostStart').onclick = () => {
-      broadcastPacket({ t: 'START_CD' });
-      startCountdownSequence();
+      send({ t: 'START_COUNT' });
+      runCountdown();
     };
 
-    function startCountdownSequence() {
-      screenLobby.classList.add('hidden');
-      const overlay = document.getElementById('overlayCountdown');
-      const txt = document.getElementById('txtCountdown');
-      overlay.classList.remove('hidden');
-
-      let count = 3;
-      txt.innerText = count;
-      AudioEngine.play('countdown_tick');
-
+    function runCountdown() {
+      document.getElementById('screenLobby').classList.add('hidden');
+      const o = document.getElementById('overlayCountdown'), txt = document.getElementById('txtCountdown');
+      o.classList.remove('hidden');
+      let c = 3; txt.innerText = c; AudioEngine.play('tick');
       const timer = setInterval(() => {
-        count--;
-        if (count > 0) {
-          txt.innerText = count;
-          AudioEngine.play('countdown_tick');
-        } else if (count === 0) {
-          txt.innerText = 'START!';
-          AudioEngine.play('countdown_start');
-        } else {
+        c--;
+        if (c > 0) { txt.innerText = c; AudioEngine.play('tick'); }
+        else if (c === 0) { txt.innerText = 'START!'; AudioEngine.play('go'); }
+        else {
           clearInterval(timer);
-          overlay.classList.add('hidden');
+          o.classList.add('hidden');
           document.getElementById('hudTop').classList.remove('hidden');
           document.getElementById('hudPlayerHp').classList.remove('hidden');
           startWave(1);
@@ -2315,95 +1419,103 @@
       }, 900);
     }
 
-    document.getElementById('btnShopReadyToggle').onclick = toggleMyReadyState;
+    // --- 写真設定 ---
+    document.getElementById('btnOpenPhotoSetting').onclick = () => document.getElementById('modalPhotos').classList.remove('hidden');
+    document.getElementById('btnClosePhotos').onclick = () => document.getElementById('modalPhotos').classList.add('hidden');
+    document.getElementById('btnSavePhotos').onclick = () => document.getElementById('modalPhotos').classList.add('hidden');
 
+    document.getElementById('inputMaleImg').onchange = e => {
+      const f = e.target.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = ev => {
+        localStorage.setItem('sdf_photo_male', ev.target.result);
+        ImageStamp.init();
+      };
+      r.readAsDataURL(f);
+    };
+    document.getElementById('inputFemaleImg').onchange = e => {
+      const f = e.target.files[0]; if (!f) return;
+      const r = new FileReader();
+      r.onload = ev => {
+        localStorage.setItem('sdf_photo_female', ev.target.result);
+        ImageStamp.init();
+      };
+      r.readAsDataURL(f);
+    };
+
+    // --- 兵舎・バッジガチャ ---
     document.getElementById('btnOpenBarracks').onclick = () => {
       document.getElementById('modalBarracks').classList.remove('hidden');
-      renderBarracks();
+      renderBarracksUI();
     };
-    document.getElementById('btnCloseBarracks').onclick = () => {
-      document.getElementById('modalBarracks').classList.add('hidden');
-    };
+    document.getElementById('btnCloseBarracks').onclick = () => document.getElementById('modalBarracks').classList.add('hidden');
 
-    function renderBarracks() {
-      const grid = document.getElementById('barracksCharGrid');
-      grid.innerHTML = '';
+    function renderBarracksUI() {
+      const g = document.getElementById('barracksCharGrid');
+      g.innerHTML = '';
       CHARACTERS.forEach(c => {
-        const isUnlocked = state.unlockedChars.includes(c.id);
-        const isSelected = (state.selectedChar === c.id);
-        const card = document.createElement('div');
-        card.className = `p-2.5 rounded-2xl border-2 text-center transition cursor-pointer ${
-          isSelected ? 'border-rose-500 bg-rose-950/40' : (isUnlocked ? 'border-slate-700 bg-slate-800' : 'border-slate-800 bg-slate-900/60 opacity-60')
-        }`;
-        card.innerHTML = `
-          <div class="text-xs font-black text-white">${c.name}</div>
-          <div class="text-[10px] text-slate-400 mt-1">${isUnlocked ? (isSelected ? '配備中' : '選択') : `${c.cost}🪙`}</div>
-        `;
-        card.onclick = () => {
-          if (isUnlocked) {
-            state.selectedChar = c.id;
-            renderBarracks();
-          } else {
-            if (state.coins >= c.cost) {
-              state.coins -= c.cost;
-              state.unlockedChars.push(c.id);
-              state.selectedChar = c.id;
-              saveStorage();
-              updateHudCoins();
-              renderBarracks();
-              AudioEngine.play('coin');
-              showToast(`${c.name} を解放しました！`, 'success');
-            } else {
-              showToast(`コインが足りません！ (必要: ${c.cost} 🪙)`, 'warn');
-            }
-          }
+        const un = state.unlockedChars.includes(c.id);
+        const sel = state.selectedChar === c.id;
+        const d = document.createElement('div');
+        d.className = `p-2.5 rounded-xl border text-center cursor-pointer ${sel ? 'border-rose-500 bg-rose-950/40' : (un ? 'border-slate-700 bg-slate-800' : 'border-slate-800 opacity-50')}`;
+        d.innerHTML = `<div class="text-xs font-bold text-white">${c.name}</div><div class="text-[10px] text-slate-400">${un ? (sel ? '選択中' : '配備') : `${c.cost}🪙`}</div>`;
+        d.onclick = () => {
+          if (un) { state.selectedChar = c.id; renderBarracksUI(); }
+          else if (state.coins >= c.cost) {
+            state.coins -= c.cost; state.unlockedChars.push(c.id); state.selectedChar = c.id;
+            saveStorage(); updateHudCoins(); renderBarracksUI(); AudioEngine.play('coin');
+          } else showToast('コイン不足！');
         };
-        grid.appendChild(card);
+        g.appendChild(d);
       });
 
-      const curDef = CHARACTERS.find(c => c.id === state.selectedChar) || CHARACTERS[0];
-      document.getElementById('selectedCharName').innerText = curDef.name;
-      const bList = document.getElementById('badgeSlotList');
-      bList.innerHTML = '';
-      const curBadges = state.charBadges[state.selectedChar] || [];
+      const cur = CHARACTERS.find(c => c.id === state.selectedChar) || CHARACTERS[0];
+      document.getElementById('selectedCharName').innerText = cur.name;
+
+      const bl = document.getElementById('badgeSlotList');
+      bl.innerHTML = '';
+      const bList = state.charBadges[state.selectedChar] || [];
       for (let i = 0; i < 3; i++) {
-        const b = curBadges[i];
-        const slot = document.createElement('div');
-        slot.className = `p-2 rounded-xl border text-center ${b ? RARITY[b.rIndex].border + ' bg-slate-900' : 'border-dashed border-slate-700 bg-slate-900/40'}`;
-        slot.innerHTML = b ? `
-          <div class="text-[9px] font-black ${RARITY[b.rIndex].color}">${RARITY[b.rIndex].name}</div>
+        const b = bList[i];
+        const s = document.createElement('div');
+        s.className = `p-2 rounded-xl border text-center ${b ? RARITY[b.rIndex].border + ' bg-slate-900' : 'border-dashed border-slate-700 bg-slate-900/40'}`;
+        s.innerHTML = b ? `
+          <div class="text-[10px] font-black ${RARITY[b.rIndex].color}">${RARITY[b.rIndex].name}</div>
           <div class="text-xs font-bold text-white mt-0.5">${b.name}</div>
           <div class="text-[10px] text-yellow-400">+${b.value}%</div>
-        ` : `<div class="text-xs text-slate-600 font-bold py-1.5">空スロット</div>`;
-        bList.appendChild(slot);
+        ` : `<div class="text-xs text-slate-600 font-bold py-2">空スロット</div>`;
+        bl.appendChild(s);
       }
     }
 
-    document.getElementById('btnRollBadge').onclick = () => rollBadgesForChar(state.selectedChar);
+    document.getElementById('btnRollBadge').onclick = () => {
+      if (state.coins < 50) { showToast('コイン不足！ (必要: 50🪙)'); return; }
+      state.coins -= 50; saveStorage(); updateHudCoins(); AudioEngine.play('coin');
 
-    document.getElementById('btnOpenPhotoSetting').onclick = () => document.getElementById('modalPhotos').classList.remove('hidden');
-    document.getElementById('btnClosePhotos').onclick = () => document.getElementById('modalPhotos').classList.add('hidden');
-    document.getElementById('btnSavePhotos').onclick = () => {
-      document.getElementById('modalPhotos').classList.add('hidden');
-      showToast('ライオン写真を保存しました', 'success');
+      const newBadges = [];
+      for (let i = 0; i < 3; i++) {
+        const bType = BADGE_TYPES[Math.floor(Math.random() * BADGE_TYPES.length)];
+        const rIndex = Math.random() < 0.6 ? 0 : (Math.random() < 0.88 ? 1 : 2);
+        newBadges.push({ typeId: bType.id, name: bType.name, rIndex, value: bType.vals[rIndex] });
+      }
+      state.charBadges[state.selectedChar] = newBadges;
+      saveStorage();
+      renderBarracksUI();
+      showToast('バッジガチャ抽選完了！', 'bg-amber-500');
     };
 
     document.getElementById('btnSoundToggle').onclick = () => {
       AudioEngine.enabled = !AudioEngine.enabled;
-      const icon = document.getElementById('soundIcon');
-      if (icon) icon.className = AudioEngine.enabled ? 'fa-solid fa-volume-high text-lg' : 'fa-solid fa-volume-xmark text-lg text-rose-400';
+      document.getElementById('soundIcon').innerText = AudioEngine.enabled ? '🔊' : '🔇';
     };
 
-    document.getElementById('btnRestartFromOver').onclick = () => location.reload();
-
     // 起動初期化
-    initPhotoSystem();
+    ImageStamp.init();
     updateHudCoins();
-    requestAnimationFrame(gameLoop);
+    requestAnimationFrame(loop);
 
     if (location.hash && location.hash.length > 1) {
-      const hashRoom = location.hash.substring(1).toUpperCase();
-      document.getElementById('inputJoinCode').value = hashRoom;
+      document.getElementById('inputJoinCode').value = location.hash.substring(1).toUpperCase();
       document.getElementById('modalJoin').classList.remove('hidden');
     }
   </script>
